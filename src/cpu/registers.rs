@@ -100,21 +100,16 @@ impl Registers {
         Registers { b: 0, c: 0, d: 0, e: 0, h: 0, l: 0, a: 0, f: 0, sp: 0, pc: 0 }
     }
 
-    pub fn set_flag(&mut self, flag: Flag) {
+    pub fn read_flag(&self, flag: Flag) -> bool {
         match flag {
-            Flag::Zero => self.f &= 0x80,
-            Flag::Sub => self.f &= 0x40,
-            Flag::HalfCarry => self.f &= 0x20,
-            Flag::Carry => self.f &= 0x10,
+            Flag::Zero => self.f & 0x80 != 0,
+            Flag::Sub => self.f & 0x40 != 0,
+            Flag::HalfCarry => self.f & 0x20 != 0,
+            Flag::Carry => self.f & 0x10 != 0,
         }
     }
 
-    pub fn read_flag(&self, flag: Flag) -> bool {
-        match flag {
-            Flag::Zero => self.f >> 8 & 1 == 1,
-            Flag::Sub => self.f >> 7 & 1 == 1,
-            Flag::HalfCarry => self.f >> 6 & 1 == 1,
-            Flag::Carry => self.f & 5 == 1,
-        }
+    pub fn set_flag(&self, flag: Flag, value: bool) {
+        todo!()
     }
 }

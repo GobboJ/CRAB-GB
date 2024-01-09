@@ -1,6 +1,8 @@
 mod cpu;
 
-use cpu::Cpu;
+use cpu::CPU;
 
 fn main() {
+
+    let cpu = CPU::new();
 }
