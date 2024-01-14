@@ -8,6 +8,7 @@ pub enum Register {
     E = 0b011,
     H = 0b100,
     L = 0b101,
+    HL_IND = 0b110,
     A = 0b111,
 }
 
@@ -51,6 +52,7 @@ impl Registers {
             Register::H => self.h,
             Register::L => self.l,
             Register::A => self.a,
+            Register::HL_IND => panic!("(HL) is not a register!"),
         }
     }
 
@@ -63,6 +65,7 @@ impl Registers {
             Register::H => self.h = value,
             Register::L => self.l = value,
             Register::A => self.a = value,
+            Register::HL_IND => panic!("(HL) is not a register!"),
         }
     }
 
@@ -111,5 +114,9 @@ impl Registers {
 
     pub fn set_flag(&self, flag: Flag, value: bool) {
         todo!()
+    }
+
+    pub fn read_pc(&self) -> u16 {
+        self.pc
     }
 }
