@@ -1,4 +1,5 @@
 use num_derive::FromPrimitive;
+use num_traits::WrappingSub;
 
 #[derive(FromPrimitive)]
 pub enum Register {
@@ -8,7 +9,7 @@ pub enum Register {
     E = 0b011,
     H = 0b100,
     L = 0b101,
-    HL_IND = 0b110,
+    HL_MEM = 0b110,
     A = 0b111,
 }
 
@@ -17,14 +18,30 @@ pub enum DoubleRegister {
     BC = 0b00,
     DE = 0b01,
     HL = 0b10,
-    AF = 0b11
+    SP = 0b11
+}
+
+#[derive(FromPrimitive)]
+pub enum DoubleRegisterMem {
+    BC,
+    DE,
+    HLI,
+    HLD
 }
 
 pub enum Flag {
-    Zero,
-    Sub,
-    HalfCarry,
-    Carry
+    Z,
+    N,
+    H,
+    C
+}
+
+#[derive(FromPrimitive)]
+pub enum Condition {
+    NZ,
+    Z,
+    NC,
+    C
 }
 
 
@@ -52,7 +69,7 @@ impl Registers {
             Register::H => self.h,
             Register::L => self.l,
             Register::A => self.a,
-            Register::HL_IND => panic!("(HL) is not a register!"),
+            Register::HL_MEM => panic!("(HL) is not a register!"),
         }
     }
 
@@ -65,7 +82,7 @@ impl Registers {
             Register::H => self.h = value,
             Register::L => self.l = value,
             Register::A => self.a = value,
-            Register::HL_IND => panic!("(HL) is not a register!"),
+            Register::HL_MEM => panic!("(HL) is not a register!"),
         }
     }
 
@@ -74,7 +91,28 @@ impl Registers {
             DoubleRegister::BC => (self.b as u16) << 8 | self.c as u16,
             DoubleRegister::DE => (self.d as u16) << 8 | self.e as u16,
             DoubleRegister::HL => (self.h as u16) << 8 | self.l as u16,
-            DoubleRegister::AF => (self.a as u16) << 8 | self.f as u16
+            DoubleRegister::SP => self.sp
+        }
+    }
+
+    pub fn read_double_register_mem(&self, rr: DoubleRegisterMem) -> u16 {
+        match rr {
+            DoubleRegisterMem::BC => (self.b as u16) << 8 | self.c as u16,
+            DoubleRegisterMem::DE => (self.d as u16) << 8 | self.e as u16,
+            DoubleRegisterMem::HLI => {
+                let ret = (self.h as u16) << 8 | self.l as u16;
+                let mut inc = ret.wrapping_add(1);
+                self.h = (inc >> 8) as u8;
+                self.l = inc as u8;
+                ret
+            },
+            DoubleRegisterMem::HLD => {
+                let ret = (self.h as u16) << 8 | self.l as u16;
+                let mut dec = ret.wrapping_sub(1);
+                self.h = (dec >> 8) as u8;
+                self.l = dec as u8;
+                ret
+            },
         }
     }
 
@@ -92,9 +130,8 @@ impl Registers {
                 self.h = (value >> 8) as u8;
                 self.l = value as u8;
             },
-            DoubleRegister::AF => {
-                self.a = (value >> 8) as u8;
-                self.f = value as u8;
+            DoubleRegister::SP => {
+                self.sp = value;
             },
         }
     }
@@ -105,18 +142,55 @@ impl Registers {
 
     pub fn read_flag(&self, flag: Flag) -> bool {
         match flag {
-            Flag::Zero => self.f & 0x80 != 0,
-            Flag::Sub => self.f & 0x40 != 0,
-            Flag::HalfCarry => self.f & 0x20 != 0,
-            Flag::Carry => self.f & 0x10 != 0,
+            Flag::Z => self.f & 0x80 != 0,
+            Flag::N => self.f & 0x40 != 0,
+            Flag::H => self.f & 0x20 != 0,
+            Flag::C => self.f & 0x10 != 0,
         }
     }
 
-    pub fn set_flag(&self, flag: Flag, value: bool) {
-        todo!()
+    pub fn set_flag(&mut self, flag: Flag) {
+        match flag {
+            Flag::Z => self.f |= 1 << 7,
+            Flag::N => self.f |= 1 << 6,
+            Flag::H => self.f |= 1 << 5,
+            Flag::C => self.f |= 1 << 4,
+        }
     }
+
+    pub fn unset_flag(&mut self, flag: Flag) {
+        match flag {
+            Flag::Z => self.f &= !(1 << 7),
+            Flag::N => self.f &= !(1 << 6),
+            Flag::H => self.f &= !(1 << 5),
+            Flag::C => self.f &= !(1 << 4),
+        }
+    }
+
+    pub fn toggle_flag(mut self, flag: Flag) {
+        match flag {
+            Flag::Z => self.f ^= 1 << 7,
+            Flag::N => self.f ^= 1 << 6,
+            Flag::H => self.f ^= 1 << 5,
+            Flag::C => self.f ^= 1 << 4,
+        }
+    }
+
+    pub fn check_condition(&self, cond: Condition) -> bool {
+        match cond {
+            Condition::NZ => !self.read_flag(Flag::Z),
+            Condition::Z => self.read_flag(Flag::Z),
+            Condition::NC => !self.read_flag(Flag::C),
+            Condition::C => self.read_flag(Flag::C),
+        }
+    }
+
 
     pub fn read_pc(&self) -> u16 {
         self.pc
+    }
+
+    pub fn increase_pc(&mut self, value: u16) {
+        self.pc = self.pc.wrapping_add(value);
     }
 }

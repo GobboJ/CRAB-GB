@@ -53,6 +53,14 @@ impl Memory {
     fn read_work_ram(&self, address: u16) -> u8 {
         self.work_ram[address as usize]
     }
+
+    fn write_external_ram(&mut self, address: u16, data: u8) {
+        self.external_ram[address as usize] = data;
+    }
+
+    fn write_work_ram(&mut self, address: u16, data: u8) {
+        self.external_ram[address as usize] = data;
+    }
     
     pub fn read(&self, address: u16) -> u8 {
         match address {
@@ -60,6 +68,14 @@ impl Memory {
             0x4000..=0x7FFF => self.read_rom_bank_n(address - 0x4000),
             0xA000..=0xBFFF => self.read_external_ram(address - 0xA000),
             0xD000..=0xDFFF => self.read_work_ram(address - 0xD000),
+            x => panic!("Accessed unimplemented area: {}", x)
+        }
+    }
+
+    pub fn write(&mut self, address: u16, data: u8) {
+        match address {
+            0xA000..=0xBFFF => self.write_external_ram(address - 0xA000, data),
+            0xD000..=0xDFFF => self.write_work_ram(address - 0xD000, data),
             x => panic!("Accessed unimplemented area: {}", x)
         }
     }
