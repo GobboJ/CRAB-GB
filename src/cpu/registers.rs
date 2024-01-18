@@ -22,6 +22,14 @@ pub enum DoubleRegister {
 }
 
 #[derive(FromPrimitive)]
+pub enum DoubleRegisterStack {
+    BC,
+    DE,
+    HL,
+    AF
+}
+
+#[derive(FromPrimitive)]
 pub enum DoubleRegisterMem {
     BC,
     DE,
@@ -73,7 +81,7 @@ impl Registers {
         }
     }
 
-    pub fn set_register(&mut self, r: Register, value: u8) {
+    pub fn write_register(&mut self, r: Register, value: u8) {
         match r {
             Register::B => self.b = value,
             Register::C => self.c = value,
@@ -92,6 +100,15 @@ impl Registers {
             DoubleRegister::DE => (self.d as u16) << 8 | self.e as u16,
             DoubleRegister::HL => (self.h as u16) << 8 | self.l as u16,
             DoubleRegister::SP => self.sp
+        }
+    }
+
+    pub fn read_double_register_stack(&self, rr: DoubleRegisterStack) -> u16 {
+        match rr {
+            DoubleRegisterStack::BC => (self.b as u16) << 8 | self.c as u16,
+            DoubleRegisterStack::DE => (self.d as u16) << 8 | self.e as u16,
+            DoubleRegisterStack::HL => (self.h as u16) << 8 | self.l as u16,
+            DoubleRegisterStack::AF => (self.a as u16) << 8 | self.f as u16
         }
     }
 
@@ -116,7 +133,7 @@ impl Registers {
         }
     }
 
-    pub fn set_double_register(&mut self, rr: DoubleRegister, value: u16) {
+    pub fn write_double_register(&mut self, rr: DoubleRegister, value: u16) {
         match rr {
             DoubleRegister::BC => {
                 self.b = (value >> 8) as u8;
@@ -132,6 +149,27 @@ impl Registers {
             },
             DoubleRegister::SP => {
                 self.sp = value;
+            },
+        }
+    }
+
+    pub fn write_double_register_stack(&mut self, rr: DoubleRegisterStack, value: u16) {
+        match rr {
+            DoubleRegisterStack::BC => {
+                self.b = (value >> 8) as u8;
+                self.c = value as u8;
+            },
+            DoubleRegisterStack::DE => {
+                self.d = (value >> 8) as u8;
+                self.e = value as u8;
+            },
+            DoubleRegisterStack::HL => {
+                self.h = (value >> 8) as u8;
+                self.l = value as u8;
+            },
+            DoubleRegisterStack::AF => {
+                self.a = (value >> 8) as u8;
+                self.f = value as u8;
             },
         }
     }
@@ -176,6 +214,16 @@ impl Registers {
         }
     }
 
+    pub fn write_flag(mut self, flag: Flag, value: bool) {
+        let bit = value as u8;
+        match flag {
+            Flag::Z => self.f = (self.f & !(bit << 7)) | (bit << 7),
+            Flag::N => self.f = (self.f & !(bit << 6)) | (bit << 6),
+            Flag::H => self.f = (self.f & !(bit << 5)) | (bit << 5),
+            Flag::C => self.f = (self.f & !(bit << 4)) | (bit << 4),
+        }
+    }
+
     pub fn check_condition(&self, cond: Condition) -> bool {
         match cond {
             Condition::NZ => !self.read_flag(Flag::Z),
@@ -192,5 +240,13 @@ impl Registers {
 
     pub fn increase_pc(&mut self, value: u16) {
         self.pc = self.pc.wrapping_add(value);
+    }
+
+    pub fn write_pc(&mut self, value: u16) {
+        self.pc = value;
+    }
+
+    pub fn increase_sp(&mut self, value: u16) {
+        self.sp = self.sp.wrapping_add(value);
     }
 }
