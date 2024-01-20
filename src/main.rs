@@ -5,7 +5,7 @@ use cpu::CPU;
 fn main() {
 
     let mut cpu = CPU::new();
-    while true {
+    loop {
         cpu.step();
         
     }

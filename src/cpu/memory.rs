@@ -68,7 +68,7 @@ impl Memory {
             0x4000..=0x7FFF => self.read_rom_bank_n(address - 0x4000),
             0xA000..=0xBFFF => self.read_external_ram(address - 0xA000),
             0xD000..=0xDFFF => self.read_work_ram(address - 0xD000),
-            x => panic!("Accessed unimplemented area: {}", x)
+            x => panic!("Accessed unimplemented area: {:x}", x)
         }
     }
 
@@ -76,7 +76,7 @@ impl Memory {
         match address {
             0xA000..=0xBFFF => self.write_external_ram(address - 0xA000, data),
             0xD000..=0xDFFF => self.write_work_ram(address - 0xD000, data),
-            x => panic!("Accessed unimplemented area: {}", x)
+            x => panic!("Accessed unimplemented area: {:x}", x)
         }
     }
 }
