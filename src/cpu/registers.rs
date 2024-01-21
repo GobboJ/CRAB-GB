@@ -237,8 +237,12 @@ impl Registers {
         self.pc
     }
 
-    pub fn increase_pc(&mut self, value: u16) {
-        self.pc = self.pc.wrapping_add(value);
+    pub fn increase_pc(&mut self) {
+        self.pc = self.pc.wrapping_add(1);
+    }
+
+    pub fn offset_pc(&mut self, offset: i8) {
+        self.pc = self.pc.wrapping_add_signed(offset as i16);
     }
 
     pub fn write_pc(&mut self, value: u16) {

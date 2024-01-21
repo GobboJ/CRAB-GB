@@ -22,10 +22,17 @@ impl CPU {
         }
     }
 
-    pub fn step(&mut self) -> u8 {
-        let pc = self.registers.read_pc();
-        let byte = self.memory.read(pc);
-        self.registers.increase_pc(1);
+    pub fn run(&mut self) {
+        loop {
+            let byte = self.memory.read(self.registers.read_pc());
+            self.registers.increase_pc();
+            self.decode(byte);
+        }
+    }
+
+    pub fn decode(&mut self, byte: u8) -> u8 {
+
+        println!("{:x}", byte);
 
         match byte {
             /*
@@ -33,14 +40,14 @@ impl CPU {
             */
             0x00 => {
                 // NOP
-                2
+                1
             },
             0x08 => {
                 // LD (u16), SP
-                let lsb = self.memory.read(pc);
-                self.registers.increase_pc(1);
-                let msb = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let lsb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
+                let msb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
                 let address = (msb as u16) << 8 | (lsb as u16);
                 let sp = self.registers.read_double_register(&registers::DoubleRegister::SP);
                 self.memory.write(address, (sp & 0x0F) as u8); // is it 0xFF instead ?
@@ -49,24 +56,25 @@ impl CPU {
             },
             0x10 => {
                 // STOP
-                todo!()
+                self.registers.increase_pc();
+                1
             },
             0x18 => {
                 // JR i8
-                let offset = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let offset = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
 
-                self.registers.increase_pc(offset as u16);
+                self.registers.offset_pc(offset as i8);
                 3
             },
             0x20 | 0x28 | 0x30 | 0x38 => {
                 // JR cond, i8
-                let offset = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let offset = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
 
                 let cond = &FromPrimitive::from_u8((byte >> 3) & 0b00000011).unwrap();
                 if self.registers.check_condition(cond) {
-                    self.registers.increase_pc(offset as u16);
+                    self.registers.offset_pc(offset as i8);
                     3
                 } else {
                     2
@@ -76,10 +84,10 @@ impl CPU {
                 // LD r16, u16
                 let register = &FromPrimitive::from_u8((byte >> 4) & 0b00000011).unwrap();
                 
-                let lsb = self.memory.read(pc);
-                self.registers.increase_pc(1);
-                let msb = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let lsb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
+                let msb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
 
                 self.registers.write_double_register(register, (msb as u16) << 8 | (lsb as u16));
                 3
@@ -146,14 +154,10 @@ impl CPU {
                         (1, result)
                     }
                 };
-                 
+
+                self.registers.write_flag(&Flag::Z, result == 0);
                 self.registers.unset_flag(&Flag::N);
-                if result == 0 {
-                    self.registers.set_flag(&Flag::Z);
-                }
-                if result & 0xf == 0xf {
-                    self.registers.set_flag(&Flag::H);
-                }
+                self.registers.write_flag(&Flag::H, result >= 0x10); // ?
                 cycles
             },
             0x05 | 0x0D | 0x15 | 0x1D | 0x25 | 0x2D | 0x35 | 0x3D => {
@@ -184,14 +188,14 @@ impl CPU {
             },
             0x06 | 0x0E | 0x16 | 0x1E | 0x26 | 0x2E | 0x36 | 0x3E => {
                 // LD r8, u8
-                let r = &FromPrimitive::from_u8((byte >> 3) & 0b00000111).unwrap();
-                let n = self.memory.read(pc);
-                self.registers.increase_pc(1);
-                if let registers::Register::HL = r {
+                let register = &FromPrimitive::from_u8((byte >> 3) & 0b00000111).unwrap();
+                let n = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
+                if let registers::Register::HL = register {
                     self.memory.write(self.registers.read_double_register(&registers::DoubleRegister::HL), n);
                     3
                 } else { 
-                    self.registers.write_register(&r, n);
+                    self.registers.write_register(&register, n);
                     2 
                 }
             },
@@ -366,7 +370,7 @@ impl CPU {
 
                 self.registers.write_flag(&Flag::C, overflow);
                 self.registers.write_flag(&Flag::Z, result == 0);
-                self.registers.write_flag(&Flag::H, ((a & 0xf) - (data & 0xf)) & (0xf + 1) != 0);
+                self.registers.write_flag(&Flag::H, ((a & 0xf).wrapping_sub(data & 0xf)) & (0xf + 1) != 0);
                 self.registers.set_flag(&Flag::N);
                 cycles
             },
@@ -423,14 +427,10 @@ impl CPU {
                 let res = self.registers.read_register(&registers::Register::A) ^ data;
                 self.registers.write_register(&registers::Register::A, res);
 
-                self.registers.unset_flag(&Flag::Z);
+                self.registers.write_flag(&Flag::Z, res == 0);
                 self.registers.unset_flag(&Flag::N);
                 self.registers.unset_flag(&Flag::H);
                 self.registers.unset_flag(&Flag::C);
-                if res == 0 {
-                    self.registers.set_flag(&Flag::Z);
-                }
-
                 cycles
             },
             0xB0..=0xB7 => {
@@ -513,10 +513,10 @@ impl CPU {
             0xC2 | 0xCA | 0xD2 | 0xDA => {
                 // JP cond, u16
                 let condition = &FromPrimitive::from_u8((byte >> 3) & 0b00000011).unwrap();
-                let lsb = self.memory.read(pc);
-                self.registers.increase_pc(1);
-                let msb = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let lsb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
+                let msb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
                 let address = (msb as u16) << 8 | (lsb as u16);
                 
                 if self.registers.check_condition(condition) {
@@ -528,10 +528,10 @@ impl CPU {
             },
             0xC3 => {
                 // JP u16
-                let lsb = self.memory.read(pc);
-                self.registers.increase_pc(1);
-                let msb = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let lsb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
+                let msb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
                 let address = (msb as u16) << 8 | (lsb as u16);
                 self.registers.write_pc(address);
                 4
@@ -539,17 +539,17 @@ impl CPU {
             0xC4 | 0xCC | 0xD4 | 0xDC => {
                 // CALL cond, u16
                 let condition = &FromPrimitive::from_u8((byte >> 3) & 0b00000011).unwrap();
-                let lsb = self.memory.read(pc);
-                self.registers.increase_pc(1);
-                let msb = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let lsb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
+                let msb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
                 let address = (msb as u16) << 8 | (lsb as u16);
 
                 if self.registers.check_condition(condition) {
                     self.registers.decrement_sp(1);
-                    self.memory.write(self.registers.read_double_register(&registers::DoubleRegister::SP), pc as u8);
+                    self.memory.write(self.registers.read_double_register(&registers::DoubleRegister::SP), (self.registers.read_pc() >> 8) as u8);
                     self.registers.decrement_sp(1);
-                    self.memory.write(self.registers.read_double_register(&registers::DoubleRegister::SP), (pc >> 8) as u8);
+                    self.memory.write(self.registers.read_double_register(&registers::DoubleRegister::SP), self.registers.read_pc() as u8);
                     self.registers.write_pc(address);
                     6
                 } else {
@@ -568,22 +568,22 @@ impl CPU {
             },
             0xCD => {
                 // CALL u16
-                let lsb = self.memory.read(pc);
-                self.registers.increase_pc(1);
-                let msb = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let lsb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
+                let msb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
                 let address = (msb as u16) << 8 | (lsb as u16);
                 self.registers.decrement_sp(1);
-                self.memory.write(self.registers.read_double_register(&registers::DoubleRegister::SP), pc as u8);
+                self.memory.write(self.registers.read_double_register(&registers::DoubleRegister::SP), (self.registers.read_pc() >> 8) as u8);
                 self.registers.decrement_sp(1);
-                self.memory.write(self.registers.read_double_register(&registers::DoubleRegister::SP), (pc >> 8) as u8);
+                self.memory.write(self.registers.read_double_register(&registers::DoubleRegister::SP), self.registers.read_pc() as u8);
                 self.registers.write_pc(address);
                 6
             },
             0xC6 => {
                 // ADD A, u8
-                let value = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let value = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
                 let a = self.registers.read_register(&registers::Register::A);
 
                 let (result, overflow)= a.overflowing_add(value);
@@ -597,8 +597,8 @@ impl CPU {
             },
             0xCE => {
                 // ADC A, u8
-                let value = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let value = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
                 let a = self.registers.read_register(&registers::Register::A);
                 let carry = self.registers.read_flag(&Flag::C) as u8;
 
@@ -613,8 +613,8 @@ impl CPU {
             },
             0xD6 => {
                 // SUB A, u8
-                let value = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let value = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
                 let a = self.registers.read_register(&registers::Register::A);
 
                 let (result, overflow )= a.overflowing_sub(value);
@@ -628,8 +628,8 @@ impl CPU {
             },
             0xDE => {
                 // SBC A, u8
-                let value = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let value = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
                 let a = self.registers.read_register(&registers::Register::A);
                 let carry = self.registers.read_flag(&Flag::C) as u8;
 
@@ -644,8 +644,8 @@ impl CPU {
             },
             0xE6 => {
                 // AND A, u8
-                let value = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let value = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
                 let a = self.registers.read_register(&registers::Register::A);
                 let result = a & value;
                 self.registers.write_register(&registers::Register::A, result);
@@ -659,8 +659,8 @@ impl CPU {
             },
             0xEE => {
                 // XOR A, u8
-                let value = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let value = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
                 let result = self.registers.read_register(&registers::Register::A) ^ value;
                 self.registers.write_register(&registers::Register::A, result);
 
@@ -672,8 +672,8 @@ impl CPU {
             },
             0xF6 => {
                 // OR A, u8
-                let value = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let value = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
                 let a = self.registers.read_register(&registers::Register::A);
                 let result = a | value;
                 self.registers.write_register(&registers::Register::A, result);
@@ -687,15 +687,15 @@ impl CPU {
             },
             0xFE => {
                 // CP A, u8
-                let value = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let value = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
                 let a = self.registers.read_register(&registers::Register::A);
+                let (result, overflow )= a.overflowing_sub(value);
 
-                let (result, overflow )= a.overflowing_sub(value );
-                self.registers.write_flag(&Flag::C, overflow);
                 self.registers.write_flag(&Flag::Z, result == 0);
-                self.registers.write_flag(&Flag::H, ((a & 0xf) - (value & 0xf)) & (0xf + 1) != 0);
                 self.registers.set_flag(&Flag::N);
+                self.registers.write_flag(&Flag::H, ((a & 0xf).wrapping_sub(value & 0xf)) & (0xf + 1) != 0);
+                self.registers.write_flag(&Flag::C, overflow);
 
                 2
             },
@@ -705,24 +705,24 @@ impl CPU {
             },
             0xE0 => {
                 // LD (FF00+u8), A
-                let offset= self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let offset= self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
 
                 self.memory.write(0xff00 + offset as u16, self.registers.read_register(&registers::Register::A));
                 3
             },
             0xF0 => {
                 // LD A, (FF00+u8)
-                let offset= self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let offset= self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
 
                 self.registers.write_register(&registers::Register::A, self.memory.read(0xff00 + offset as u16));
                 3
             },
             0xE8 => {
                 // ADD SP, i8
-                let value = self.memory.read(pc) as i8;
-                self.registers.increase_pc(1);
+                let value = self.memory.read(self.registers.read_pc()) as i8;
+                self.registers.increase_pc();
                 let sp = self.registers.read_double_register(&registers::DoubleRegister::SP);
                 let (result, overflow) = sp.overflowing_add_signed(value as i16);
                 self.registers.write_double_register(&registers::DoubleRegister::SP, result);
@@ -735,8 +735,8 @@ impl CPU {
             },
             0xF8 => {
                 // LD HL, SP+i8
-                let value = self.memory.read(pc) as i8;
-                self.registers.increase_pc(1);
+                let value = self.memory.read(self.registers.read_pc()) as i8;
+                self.registers.increase_pc();
                 let sp = self.registers.read_double_register(&registers::DoubleRegister::SP);
                 let (result, overflow) = sp.overflowing_add_signed(value as i16);
                 self.registers.write_double_register(&registers::DoubleRegister::HL, result);
@@ -769,10 +769,10 @@ impl CPU {
             0xEA => {
                 // LD (u16), A
                 let a = self.registers.read_register(&registers::Register::A);
-                let lsb = self.memory.read(pc);
-                self.registers.increase_pc(1);
-                let msb = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let lsb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
+                let msb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
                 let address = (msb as u16) << 8 | (lsb as u16);
 
                 self.memory.write(address, a);
@@ -787,10 +787,10 @@ impl CPU {
             },
             0xFA => {
                 // LD A, (u16)
-                let lsb = self.memory.read(pc);
-                self.registers.increase_pc(1);
-                let msb = self.memory.read(pc);
-                self.registers.increase_pc(1);
+                let lsb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
+                let msb = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
                 let address = (msb as u16) << 8 | (lsb as u16);
 
                 self.registers.write_register(&registers::Register::A, self.memory.read(address));
@@ -809,7 +809,9 @@ impl CPU {
                 Group CB
             */
             0xCB => {
-                let cb_instruction: u8 = self.memory.read(pc + 1);
+                let cb_instruction: u8 = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
+                
                 match cb_instruction {
                     0x00..=0x07 => {
                         // RLC r8
@@ -988,20 +990,19 @@ impl CPU {
                         let register = &FromPrimitive::from_u8(byte & 0b00000111).unwrap();
                         let bit = (byte >> 3) & 0b00000111;
 
+                        let (cycles, value) =  match register {
+                            registers::Register::HL => {
+                                (3, self.memory.read(self.registers.read_double_register(&registers::DoubleRegister::HL)))
+                            },
+                            _ => {
+                                (2, self.registers.read_register(register))
+                            }
+                        };
+                        self.registers.write_flag(&Flag::Z, value >> bit & 1 == 0);
                         self.registers.unset_flag(&Flag::N);
-                        self.registers.set_flag(&Flag::C);
+                        self.registers.set_flag(&Flag::H);
 
-                        if let registers::Register::HL = register {
-                            if self.memory.read(self.registers.read_double_register(&registers::DoubleRegister::HL)) >> bit & 1 == 0 {
-                                self.registers.set_flag(&Flag::Z);
-                            }
-                            3
-                        } else {
-                            if self.registers.read_register(register) >> bit & 1 == 0 {
-                                self.registers.set_flag(&Flag::Z);
-                            }
-                            2
-                        }
+                        cycles
                     },
                     0x80..=0xBF => {
                         // RES b3, r8
