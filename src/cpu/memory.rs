@@ -63,12 +63,17 @@ impl Memory {
             high_ram: [0; 0x7F]
         };
 
+        memory.load_rom();
+
         memory
     }
 
 
-    pub fn load_rom(&self) {
-        todo!()
+    pub fn load_rom(&mut self) {
+        let data = fs::read("roms/01-special.gb").expect("Rom image not found!");
+        let (bank_0, bank_1) = data.split_at(0x4000);
+        self.rom_bank_0.copy_from_slice(bank_0);
+        self.rom_bank_n.copy_from_slice(bank_1);
     }
 
     fn read_bootrom(&self, address: u16) -> u8 {
@@ -136,7 +141,7 @@ impl Memory {
             0x4000..=0x7FFF => self.read_rom_bank_n(address - 0x4000),
             0x8000..=0x9FFF => self.read_video_ram(address - 0x8000),
             0xA000..=0xBFFF => self.read_external_ram(address - 0xA000),
-            0xD000..=0xDFFF => self.read_work_ram(address - 0xD000),
+            0xC000..=0xDFFF => self.read_work_ram(address - 0xC000),
             0xFF00..=0xFF7F => self.read_io_registers(address - 0xFF00),
             0xFF80..=0xFFFE => self.read_high_ram(address - 0xFF80),
             x => panic!("Accessed reading unimplemented area: {:x}", x)
@@ -147,8 +152,14 @@ impl Memory {
         match address {
             0x8000..=0x9FFF => self.write_video_ram(address - 0x8000, data),
             0xA000..=0xBFFF => self.write_external_ram(address - 0xA000, data),
-            0xD000..=0xDFFF => self.write_work_ram(address - 0xD000, data),
-            0xFF00..=0xFF7F => self.write_io_registers(address - 0xFF00, data),
+            0xC000..=0xDFFF => self.write_work_ram(address - 0xC000, data),
+            0xFF00..=0xFF7F => {
+                self.write_io_registers(address - 0xFF00, data);
+                if let 0xFF50 = address {
+                    println!("Disabled bootrom!");
+                    self.bootrom.set_disable();
+                }
+            },
             0xFF80..=0xFFFE => self.write_high_ram(address - 0xFF80, data),
             x => panic!("Accessed writing unimplemented area: {:x}", x)
         }
