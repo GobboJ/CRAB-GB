@@ -216,10 +216,10 @@ impl Registers {
     pub fn write_flag(&mut self, flag: &Flag, value: bool) {
         let bit = value as u8;
         match flag {
-            Flag::Z => self.f = (self.f & !(bit << 7)) | (bit << 7),
-            Flag::N => self.f = (self.f & !(bit << 6)) | (bit << 6),
-            Flag::H => self.f = (self.f & !(bit << 5)) | (bit << 5),
-            Flag::C => self.f = (self.f & !(bit << 4)) | (bit << 4),
+            Flag::Z => self.f = (self.f & !(1 << 7)) | (bit << 7),
+            Flag::N => self.f = (self.f & !(1 << 6)) | (bit << 6),
+            Flag::H => self.f = (self.f & !(1 << 5)) | (bit << 5),
+            Flag::C => self.f = (self.f & !(1 << 4)) | (bit << 4),
         }
     }
 
