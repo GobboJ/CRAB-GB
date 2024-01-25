@@ -142,6 +142,7 @@ impl Memory {
             0x8000..=0x9FFF => self.read_video_ram(address - 0x8000),
             0xA000..=0xBFFF => self.read_external_ram(address - 0xA000),
             0xC000..=0xDFFF => self.read_work_ram(address - 0xC000),
+            0xE000..=0xFDFF => self.read_work_ram(address - 0xE000),
             0xFF00..=0xFF7F => self.read_io_registers(address - 0xFF00),
             0xFF80..=0xFFFE => self.read_high_ram(address - 0xFF80),
             x => panic!("Accessed reading unimplemented area: {:x}", x)

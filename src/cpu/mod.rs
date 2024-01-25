@@ -12,7 +12,8 @@ use crate::cpu::registers::Register;
 pub struct CPU {
 
     registers: Registers,
-    memory: Memory
+    memory: Memory,
+    enable_interrupts: bool
    
 }
 
@@ -22,6 +23,7 @@ impl CPU {
         CPU {
             registers: Registers::new(),
             memory: Memory::new(),
+            enable_interrupts: false
         }
     }
 
@@ -35,7 +37,7 @@ impl CPU {
 
     pub fn decode(&mut self, byte: u8) -> u8 {
 
-        println!("{:x}", byte);
+        println!("[{:#06x}] {:#04x}", self.registers.read_pc() - 1, byte);
 
         match byte {
             /*
@@ -59,8 +61,9 @@ impl CPU {
             },
             0x10 => {
                 // STOP
-                self.registers.increase_pc();
-                1
+                // self.registers.increase_pc();
+                // 1
+                todo!()
             },
             0x18 => {
                 // JR i8
@@ -669,7 +672,6 @@ impl CPU {
                 self.registers.increase_pc();
                 let a = self.registers.read_register(&Register::A);
                 let (result, overflow )= a.overflowing_sub(value);
-
                 self.registers.write_flag(&Flag::Z, result == 0);
                 self.registers.set_flag(&Flag::N);
                 self.registers.write_flag(&Flag::H, ((a & 0xf).wrapping_sub(value & 0xf)) & (0xf + 1) != 0);
@@ -776,11 +778,13 @@ impl CPU {
             },
             0xF3 => {
                 // DI
-                todo!()
+                self.enable_interrupts = false;
+                1
             },
             0xFB => {
                 // EI
-                todo!()
+                self.enable_interrupts = true; // TODO Enable after the next instruction
+                1
             },
             
             /*
@@ -793,7 +797,7 @@ impl CPU {
                 match cb_instruction {
                     0x00..=0x07 => {
                         // RLC r8
-                        let register = &FromPrimitive::from_u8(byte & 0b00000111).unwrap();
+                        let register = &FromPrimitive::from_u8(cb_instruction & 0b00000111).unwrap();
                         let (cycles, result) = match register {
                             Register::HL => {
                                 let r = self.memory.read(self.registers.read_double_register(&DoubleRegister::HL)).rotate_left(1);
@@ -814,7 +818,7 @@ impl CPU {
                     },
                     0x08..=0x0F => {
                         // RRC r8
-                        let register = &FromPrimitive::from_u8(byte & 0b00000111).unwrap();
+                        let register = &FromPrimitive::from_u8(cb_instruction & 0b00000111).unwrap();
                         let (cycles, result) = match register {
                             Register::HL => {
                                 let r = self.memory.read(self.registers.read_double_register(&DoubleRegister::HL));
@@ -835,7 +839,7 @@ impl CPU {
                     },
                     0x10..=0x17 => {
                         // RL r8
-                        let register = &FromPrimitive::from_u8(byte & 0b00000111).unwrap();
+                        let register = &FromPrimitive::from_u8(cb_instruction & 0b00000111).unwrap();
                         let flag = self.registers.read_flag(&Flag::C);
                         let (cycles, old, result) = match register {
                             Register::HL => {
@@ -860,7 +864,7 @@ impl CPU {
                     },
                     0x18..=0x1F => {
                         // RR r8
-                        let register = &FromPrimitive::from_u8(byte & 0b00000111).unwrap();
+                        let register = &FromPrimitive::from_u8(cb_instruction & 0b00000111).unwrap();
                         let flag = self.registers.read_flag(&Flag::C);
                         let (cycles, old, result) = match register {
                             Register::HL => {
@@ -885,7 +889,7 @@ impl CPU {
                     },
                     0x20..=0x27 => {
                         // SLA r8
-                        let register = &FromPrimitive::from_u8(byte & 0b00000111).unwrap();
+                        let register = &FromPrimitive::from_u8(cb_instruction & 0b00000111).unwrap();
                         let (cycles, old_value) = match register {
                             Register::HL => {
                                 let old = self.memory.read(self.registers.read_double_register(&DoubleRegister::HL));
@@ -906,7 +910,7 @@ impl CPU {
                     },
                     0x28..=0x2F => {
                         // SRA r8
-                        let register = &FromPrimitive::from_u8(byte & 0b00000111).unwrap();
+                        let register = &FromPrimitive::from_u8(cb_instruction & 0b00000111).unwrap();
                         let (cycles, old_value) = match register {
                             Register::HL => {
                                 let old = self.memory.read(self.registers.read_double_register(&DoubleRegister::HL));
@@ -927,7 +931,7 @@ impl CPU {
                     },
                     0x30..=0x37 => {
                         // SWAP r8
-                        let register = &FromPrimitive::from_u8(byte & 0b00000111).unwrap();
+                        let register = &FromPrimitive::from_u8(cb_instruction & 0b00000111).unwrap();
                         let (cycles, old_value) = match register {
                             Register::HL => {
                                 let r = self.memory.read(self.registers.read_double_register(&DoubleRegister::HL));
@@ -948,7 +952,7 @@ impl CPU {
                     },
                     0x38..=0x3F => {
                         // SRL r8
-                        let register = &FromPrimitive::from_u8(byte & 0b00000111).unwrap();
+                        let register = &FromPrimitive::from_u8(cb_instruction & 0b00000111).unwrap();
                         let (cycles, old_value) = match register {
                             Register::HL => {
                                 let old = self.memory.read(self.registers.read_double_register(&DoubleRegister::HL));
@@ -969,8 +973,8 @@ impl CPU {
                     },
                     0x40..=0x7F => {
                         // BIT b3, r8
-                        let register = &FromPrimitive::from_u8(byte & 0b00000111).unwrap();
-                        let bit = (byte >> 3) & 0b00000111;
+                        let register = &FromPrimitive::from_u8(cb_instruction & 0b00000111).unwrap();
+                        let bit = (cb_instruction >> 3) & 0b00000111;
 
                         let (cycles, value) =  match register {
                             Register::HL => {
@@ -988,8 +992,8 @@ impl CPU {
                     },
                     0x80..=0xBF => {
                         // RES b3, r8
-                        let register = &FromPrimitive::from_u8(byte & 0b00000111).unwrap();
-                        let bit = (byte >> 3) & 0b00000111;
+                        let register = &FromPrimitive::from_u8(cb_instruction & 0b00000111).unwrap();
+                        let bit = (cb_instruction >> 3) & 0b00000111;
 
                         if let Register::HL = register {
                             let value = self.memory.read(self.registers.read_double_register(&DoubleRegister::HL));
@@ -1002,8 +1006,8 @@ impl CPU {
                     },
                     0xC0..=0xFF => {
                         // SET b3, r8
-                        let register = &FromPrimitive::from_u8(byte & 0b00000111).unwrap();
-                        let bit = (byte >> 3) & 0b00000111;
+                        let register = &FromPrimitive::from_u8(cb_instruction & 0b00000111).unwrap();
+                        let bit = (cb_instruction >> 3) & 0b00000111;
 
                         if let Register::HL = register {
                             let value = self.memory.read(self.registers.read_double_register(&DoubleRegister::HL));
