@@ -1,5 +1,6 @@
 mod registers;
 mod memory;
+mod timer;
 
 use num_traits::FromPrimitive;
 use registers::Registers;
@@ -31,8 +32,15 @@ impl CPU {
         loop {
             let byte = self.memory.read(self.registers.read_pc());
             self.registers.increase_pc();
-            self.decode(byte);
+            let cycles = self.decode(byte);
+
+            self.memory.update_timer(cycles);
         }
+    }
+
+
+    fn interrupts(&mut self) {
+        
     }
 
     pub fn decode(&mut self, byte: u8) -> u8 {

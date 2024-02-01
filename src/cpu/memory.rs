@@ -1,5 +1,6 @@
 use std::fs;
 
+use super::timer::Timer;
 
 struct Bootrom {
     code: [u8; 0x100],
@@ -46,7 +47,9 @@ pub struct Memory {
     work_ram: [u8; 0x2000],
 
     io_registers: [u8; 0x80],
-    high_ram: [u8; 0x7F]
+    high_ram: [u8; 0x7F],
+
+    timer: Timer
 }
 
 impl Memory {
@@ -60,7 +63,9 @@ impl Memory {
             external_ram: [0; 0x2000],
             work_ram: [0; 0x2000],
             io_registers: [0; 0x80],
-            high_ram: [0; 0x7F]
+            high_ram: [0; 0x7F],
+
+            timer: Timer::new()
         };
 
         memory.load_rom();
@@ -143,7 +148,10 @@ impl Memory {
             0xA000..=0xBFFF => self.read_external_ram(address - 0xA000),
             0xC000..=0xDFFF => self.read_work_ram(address - 0xC000),
             0xE000..=0xFDFF => self.read_work_ram(address - 0xE000),
-            0xFF00..=0xFF7F => self.read_io_registers(address - 0xFF00),
+            0xFF00..=0xFF7F => {
+                println!("[IO REA] {:#06x}", address);
+                self.read_io_registers(address - 0xFF00)
+            },
             0xFF80..=0xFFFE => self.read_high_ram(address - 0xFF80),
             x => panic!("Accessed reading unimplemented area: {:x}", x)
         }
@@ -160,9 +168,14 @@ impl Memory {
                     println!("Disabled bootrom!");
                     self.bootrom.set_disable();
                 }
+                println!("[IO WRI] {:#06x} = {:#04x}", address, data);
             },
             0xFF80..=0xFFFE => self.write_high_ram(address - 0xFF80, data),
             x => panic!("Accessed writing unimplemented area: {:x}", x)
         }
+    }
+
+    pub fn update_timer(&mut self, cycles: u8) {
+        self.timer.update(cycles);
     }
 }
