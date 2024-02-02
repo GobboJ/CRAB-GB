@@ -1,6 +1,7 @@
 mod registers;
 mod memory;
 mod timer;
+mod interrupt;
 
 use num_traits::FromPrimitive;
 use registers::Registers;
@@ -34,13 +35,12 @@ impl CPU {
             self.registers.increase_pc();
             let cycles = self.decode(byte);
 
+            if self.enable_interrupts {
+                self.handle_interrupts();
+            }
+
             self.memory.update_timer(cycles);
         }
-    }
-
-
-    fn interrupts(&mut self) {
-        
     }
 
     pub fn decode(&mut self, byte: u8) -> u8 {
@@ -1030,6 +1030,36 @@ impl CPU {
                 }
             }           
             _ => panic!("Unrecognized instruction: {}", byte)
+        }
+    }
+
+    fn jump_interrupt(&mut self, target: u16) {
+        let pc = self.registers.read_pc();
+        self.registers.decrement_sp(1);
+        self.memory.write(self.registers.read_double_register(&DoubleRegister::SP), (pc >> 8) as u8);
+        self.registers.decrement_sp(1);
+        self.memory.write(self.registers.read_double_register(&DoubleRegister::SP), (pc & 0xff) as u8);
+        self.registers.write_pc(target);
+    }
+
+    fn handle_interrupts(&mut self) {
+        self.enable_interrupts = false;
+        
+        if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::VBlank){
+            self.jump_interrupt(0x40);
+            self.memory.get_interrupts().write_interrupt_flag(&interrupt::InterruptHandler::VBlank, false);
+        } else if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::LCD) {
+            self.jump_interrupt(0x48);
+            self.memory.get_interrupts().write_interrupt_flag(&interrupt::InterruptHandler::LCD, false);
+        } else if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::Timer) {
+            self.jump_interrupt(0x50);
+            self.memory.get_interrupts().write_interrupt_flag(&interrupt::InterruptHandler::Timer, false);
+        } else if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::Serial){
+            self.jump_interrupt(0x58);
+            self.memory.get_interrupts().write_interrupt_flag(&interrupt::InterruptHandler::Serial, false);
+        } else if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::Joypad) {
+            self.jump_interrupt(0x60);
+            self.memory.get_interrupts().write_interrupt_flag(&interrupt::InterruptHandler::Joypad, false);
         }
     }
 }

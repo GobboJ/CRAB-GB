@@ -1,6 +1,7 @@
 use std::fs;
 
 use super::timer::Timer;
+use super::interrupt::Interrupt;
 
 struct Bootrom {
     code: [u8; 0x100],
@@ -49,7 +50,8 @@ pub struct Memory {
     io_registers: [u8; 0x80],
     high_ram: [u8; 0x7F],
 
-    timer: Timer
+    timer: Timer,
+    interrupt: Interrupt
 }
 
 impl Memory {
@@ -65,7 +67,8 @@ impl Memory {
             io_registers: [0; 0x80],
             high_ram: [0; 0x7F],
 
-            timer: Timer::new()
+            timer: Timer::new(),
+            interrupt: Interrupt::new()
         };
 
         memory.load_rom();
@@ -177,5 +180,9 @@ impl Memory {
 
     pub fn update_timer(&mut self, cycles: u8) {
         self.timer.update(cycles);
+    }
+
+    pub fn get_interrupts(&mut self) -> &mut Interrupt {
+        &mut self.interrupt
     }
 }
