@@ -5,6 +5,7 @@ mod interrupt;
 mod gpu;
 
 use num_traits::FromPrimitive;
+use num_traits::WrappingAdd;
 use num_traits::WrappingSub;
 use registers::Registers;
 use registers::Flag;
@@ -711,30 +712,31 @@ impl CPU {
             },
             0xE8 => {
                 // ADD SP, i8
-                let value = self.memory.read(self.registers.read_pc()) as i8;
+                let value = self.memory.read(self.registers.read_pc()) as i8 as i16;
                 self.registers.increase_pc();
                 let sp = self.registers.read_double_register(&DoubleRegister::SP);
-                let (result, overflow) = sp.overflowing_add_signed(value as i16);
+
+                let result = sp.wrapping_add_signed(value);
                 self.registers.write_double_register(&DoubleRegister::SP, result);
                 
                 self.registers.unset_flag(&Flag::Z);
                 self.registers.unset_flag(&Flag::N);
-                self.registers.write_flag(&Flag::H, (sp as u8 & 0x0f).wrapping_add(value as u8 & 0x0f) > 0x0f);
-                self.registers.write_flag(&Flag::C, overflow);
+                self.registers.write_flag(&Flag::H, (sp & 0x0f).wrapping_add(value as u16 & 0x0f) > 0x0f);
+                self.registers.write_flag(&Flag::C, (sp & 0xff).wrapping_add(value as u16 & 0xff) > 0xff);
                 4
             },
             0xF8 => {
                 // LD HL, SP+i8
-                let value = self.memory.read(self.registers.read_pc()) as i8;
+                let value = self.memory.read(self.registers.read_pc()) as i8 as i16;
                 self.registers.increase_pc();
                 let sp = self.registers.read_double_register(&DoubleRegister::SP);
-                let (result, overflow) = sp.overflowing_add_signed(value as i16);
+                let result = sp.wrapping_add_signed(value);
                 self.registers.write_double_register(&DoubleRegister::HL, result);
 
                 self.registers.unset_flag(&Flag::Z);
                 self.registers.unset_flag(&Flag::N);
-                self.registers.write_flag(&Flag::H, (sp as u8 & 0x0f).wrapping_add(value as u8 & 0x0f) > 0x0f);
-                self.registers.write_flag(&Flag::C, overflow);
+                self.registers.write_flag(&Flag::H, (sp & 0x0f).wrapping_add(value as u16 & 0x0f) > 0x0f);
+                self.registers.write_flag(&Flag::C, (sp & 0xff).wrapping_add(value as u16 & 0xff) > 0xff);
                 3                
             },
             0xE9 => {

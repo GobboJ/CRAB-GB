@@ -79,7 +79,7 @@ impl Memory {
 
 
     pub fn load_rom(&mut self) {
-        let data = fs::read("roms/05-op rp.gb").expect("Rom image not found!");
+        let data = fs::read("roms/03-op sp,hl.gb").expect("Rom image not found!");
         let (bank_0, bank_1) = data.split_at(0x4000);
         self.rom_bank_0.copy_from_slice(bank_0);
         self.rom_bank_n.copy_from_slice(bank_1);
