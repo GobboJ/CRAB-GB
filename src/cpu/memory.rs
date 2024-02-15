@@ -79,7 +79,7 @@ impl Memory {
 
 
     pub fn load_rom(&mut self) {
-        let data = fs::read("roms/01-special.gb").expect("Rom image not found!");
+        let data = fs::read("roms/09-op r,r.gb").expect("Rom image not found!");
         let (bank_0, bank_1) = data.split_at(0x4000);
         self.rom_bank_0.copy_from_slice(bank_0);
         self.rom_bank_n.copy_from_slice(bank_1);
@@ -122,7 +122,7 @@ impl Memory {
     }
 
     fn write_work_ram(&mut self, address: u16, data: u8) {
-        self.external_ram[address as usize] = data;
+        self.work_ram[address as usize] = data;
     }
 
     fn write_video_ram(&mut self, address: u16, data: u8) {
