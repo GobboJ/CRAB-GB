@@ -2,6 +2,7 @@ mod registers;
 mod memory;
 mod timer;
 mod interrupt;
+mod gpu;
 
 use num_traits::FromPrimitive;
 use registers::Registers;
@@ -40,6 +41,7 @@ impl CPU {
             }
 
             self.memory.update_timer(cycles);
+            self.memory.update_gpu(cycles);
         }
     }
 

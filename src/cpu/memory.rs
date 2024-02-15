@@ -2,6 +2,7 @@ use std::fs;
 
 use super::timer::Timer;
 use super::interrupt::Interrupt;
+use super::gpu::GPU;
 
 struct Bootrom {
     code: [u8; 0x100],
@@ -43,15 +44,15 @@ pub struct Memory {
     bootrom: Bootrom,
     rom_bank_0: [u8; 0x4000],
     rom_bank_n: [u8; 0x4000],
-    video_ram: [u8; 0x2000],
     external_ram: [u8; 0x2000],
     work_ram: [u8; 0x2000],
 
-    io_registers: [u8; 0x80],
+    // io_registers: [u8; 0x80],
     high_ram: [u8; 0x7F],
 
     timer: Timer,
-    interrupt: Interrupt
+    interrupt: Interrupt,
+    gpu: GPU
 }
 
 impl Memory {
@@ -61,14 +62,14 @@ impl Memory {
             bootrom: Bootrom::new(),
             rom_bank_0: [0; 0x4000],
             rom_bank_n: [0; 0x4000],
-            video_ram: [0; 0x2000],
             external_ram: [0; 0x2000],
             work_ram: [0; 0x2000],
-            io_registers: [0; 0x80],
+            // io_registers: [0; 0x80],
             high_ram: [0; 0x7F],
 
             timer: Timer::new(),
-            interrupt: Interrupt::new()
+            interrupt: Interrupt::new(),
+            gpu: GPU::new()
         };
 
         memory.load_rom();
@@ -97,7 +98,7 @@ impl Memory {
     }
 
     fn read_video_ram(&self, address: u16) -> u8 {
-        self.video_ram[address as usize]
+        self.gpu.read_vram(address)
     }
 
     fn read_external_ram(&self, address: u16) -> u8 {
@@ -108,9 +109,9 @@ impl Memory {
         self.work_ram[address as usize]
     }
 
-    fn read_io_registers(&self, address: u16) -> u8 {
-        self.io_registers[address as usize]
-    }
+    // fn read_io_registers(&self, address: u16) -> u8 {
+    //     self.io_registers[address as usize]
+    // }
 
     fn read_high_ram(&self, address: u16) -> u8 {
         self.high_ram[address as usize]
@@ -125,12 +126,12 @@ impl Memory {
     }
 
     fn write_video_ram(&mut self, address: u16, data: u8) {
-        self.video_ram[address as usize] = data;
+        self.gpu.write_vram(address, data);
     }
 
-    fn write_io_registers(&mut self, address: u16, data: u8) {
-        self.io_registers[address as usize] = data;
-    }
+    // fn write_io_registers(&mut self, address: u16, data: u8) {
+    //     self.io_registers[address as usize] = data;
+    // }
 
     fn write_high_ram(&mut self, address: u16, data: u8) {
         self.high_ram[address as usize] = data;
@@ -151,10 +152,7 @@ impl Memory {
             0xA000..=0xBFFF => self.read_external_ram(address - 0xA000),
             0xC000..=0xDFFF => self.read_work_ram(address - 0xC000),
             0xE000..=0xFDFF => self.read_work_ram(address - 0xE000),
-            0xFF00..=0xFF7F => {
-                println!("[IO REA] {:#06x}", address);
-                self.read_io_registers(address - 0xFF00)
-            },
+            0xFF00..=0xFF7F => self.handle_read_io_register(address),
             0xFF80..=0xFFFE => self.read_high_ram(address - 0xFF80),
             x => panic!("Accessed reading unimplemented area: {:x}", x)
         }
@@ -165,21 +163,51 @@ impl Memory {
             0x8000..=0x9FFF => self.write_video_ram(address - 0x8000, data),
             0xA000..=0xBFFF => self.write_external_ram(address - 0xA000, data),
             0xC000..=0xDFFF => self.write_work_ram(address - 0xC000, data),
-            0xFF00..=0xFF7F => {
-                self.write_io_registers(address - 0xFF00, data);
-                if let 0xFF50 = address {
-                    println!("Disabled bootrom!");
-                    self.bootrom.set_disable();
-                }
-                println!("[IO WRI] {:#06x} = {:#04x}", address, data);
-            },
+            0xFF00..=0xFF7F => self.handle_write_io_register(address, data),
             0xFF80..=0xFFFE => self.write_high_ram(address - 0xFF80, data),
             x => panic!("Accessed writing unimplemented area: {:x}", x)
         }
     }
 
+
+    fn handle_read_io_register(&self, address: u16) -> u8 {
+        let res = match address {
+            0xFF44 => self.gpu.read_ly(),
+            x => panic!("Reading unknown IO Register {:x}", x)
+        };
+        println!("[IO REA] {:#06x} = {}", address, res);
+        res
+    }
+
+    fn handle_write_io_register(&mut self, address: u16, data: u8) {
+        println!("[IO WRI] {:#06x} = {:#04x}", address, data);
+        match address {
+            0xFF10..=0xFF26 => {}, // Audio
+            0xFF40 => self.gpu.write_lcd_control(data),
+            0xFF41 => self.gpu.write_lcd_status(data),
+            0xFF42 => self.gpu.write_scy(data),
+            0xFF43 => self.gpu.write_scx(data),
+            0xFF47 => self.gpu.write_bgp(data),
+            0xFF50 => {
+                println!("Disabled bootrom!");
+                self.bootrom.set_disable();
+            },
+            x => panic!("Writing unknown IO Register {:x}", x)
+        }
+    }
+
     pub fn update_timer(&mut self, cycles: u8) {
         self.timer.update(cycles);
+    }
+
+    pub fn update_gpu(&mut self, cycles: u8) {
+        let (vblank, lcd) = self.gpu.update(cycles);
+        if vblank {
+            self.get_interrupts().write_interrupt_flag(&super::interrupt::InterruptHandler::VBlank, true);
+        }
+        if lcd {
+            self.get_interrupts().write_interrupt_flag(&super::interrupt::InterruptHandler::LCD, true);
+        }
     }
 
     pub fn get_interrupts(&mut self) -> &mut Interrupt {
