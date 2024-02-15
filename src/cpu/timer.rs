@@ -49,6 +49,10 @@ impl Timer {
         self.tac = (self.tac & !(0b11)) | (frequency as u8);
     }
 
+    pub fn write_tac(&mut self, value: u8) {
+        self.tac = value;
+    }
+
     pub fn update(&mut self, cycles: u8) -> bool {
         let (result, overflow) = self.div_counter.overflowing_add(4 * cycles);
         self.div_counter = result;

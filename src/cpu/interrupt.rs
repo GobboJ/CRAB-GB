@@ -17,7 +17,19 @@ impl Interrupt {
         Interrupt { interrupt_enable: 0, interrupt_flag: 0 }
     }
 
-    pub fn write_interrupt_enable(&mut self, interrupt: &InterruptHandler, value: bool) {
+    pub fn read_interrupt_enable(&self) -> u8 {
+        self.interrupt_enable
+    }
+
+    pub fn write_interrupt_enable(&mut self, value: u8) {
+        self.interrupt_enable = value;
+    }
+
+    pub fn write_interrupt_flag(&mut self, value: u8) {
+        self.interrupt_flag = value;
+    }
+
+    pub fn write_bit_interrupt_enable(&mut self, interrupt: &InterruptHandler, value: bool) {
         let bit = value as u8;
         match interrupt {
             InterruptHandler::VBlank => self.interrupt_enable = (self.interrupt_enable & !1) | bit,
@@ -28,7 +40,7 @@ impl Interrupt {
         }
     }
 
-    pub fn write_interrupt_flag(&mut self, interrupt: &InterruptHandler, value: bool) {
+    pub fn write_bit_interrupt_flag(&mut self, interrupt: &InterruptHandler, value: bool) {
         let bit = value as u8;
         match interrupt {
             InterruptHandler::VBlank => self.interrupt_flag = (self.interrupt_flag & !1) | bit,

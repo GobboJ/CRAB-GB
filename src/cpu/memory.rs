@@ -79,7 +79,7 @@ impl Memory {
 
 
     pub fn load_rom(&mut self) {
-        let data = fs::read("roms/09-op r,r.gb").expect("Rom image not found!");
+        let data = fs::read("roms/01-special.gb").expect("Rom image not found!");
         let (bank_0, bank_1) = data.split_at(0x4000);
         self.rom_bank_0.copy_from_slice(bank_0);
         self.rom_bank_n.copy_from_slice(bank_1);
@@ -154,6 +154,7 @@ impl Memory {
             0xE000..=0xFDFF => self.read_work_ram(address - 0xE000),
             0xFF00..=0xFF7F => self.handle_read_io_register(address),
             0xFF80..=0xFFFE => self.read_high_ram(address - 0xFF80),
+            0xFFFF => self.interrupt.read_interrupt_enable(),
             x => panic!("Accessed reading unimplemented area: {:x}", x)
         }
     }
@@ -165,6 +166,7 @@ impl Memory {
             0xC000..=0xDFFF => self.write_work_ram(address - 0xC000, data),
             0xFF00..=0xFF7F => self.handle_write_io_register(address, data),
             0xFF80..=0xFFFE => self.write_high_ram(address - 0xFF80, data),
+            0xFFFF => self.interrupt.write_interrupt_enable(data),
             x => panic!("Accessed writing unimplemented area: {:x}", x)
         }
     }
@@ -175,13 +177,17 @@ impl Memory {
             0xFF44 => self.gpu.read_ly(),
             x => panic!("Reading unknown IO Register {:x}", x)
         };
-        println!("[IO REA] {:#06x} = {}", address, res);
+        // println!("[IO REA] {:#06x} = {}", address, res);
         res
     }
 
     fn handle_write_io_register(&mut self, address: u16, data: u8) {
-        println!("[IO WRI] {:#06x} = {:#04x}", address, data);
+        // println!("[IO WRI] {:#06x} = {:#04x}", address, data);
         match address {
+            0xFF01 => print!("{}", data as char),
+            0xFF02 => {},
+            0xFF07 => self.timer.write_tac(data),
+            0xFF0F => self.interrupt.write_interrupt_flag(data),
             0xFF10..=0xFF26 => {}, // Audio
             0xFF40 => self.gpu.write_lcd_control(data),
             0xFF41 => self.gpu.write_lcd_status(data),
@@ -203,10 +209,10 @@ impl Memory {
     pub fn update_gpu(&mut self, cycles: u8) {
         let (vblank, lcd) = self.gpu.update(cycles);
         if vblank {
-            self.get_interrupts().write_interrupt_flag(&super::interrupt::InterruptHandler::VBlank, true);
+            self.get_interrupts().write_bit_interrupt_flag(&super::interrupt::InterruptHandler::VBlank, true);
         }
         if lcd {
-            self.get_interrupts().write_interrupt_flag(&super::interrupt::InterruptHandler::LCD, true);
+            self.get_interrupts().write_bit_interrupt_flag(&super::interrupt::InterruptHandler::LCD, true);
         }
     }
 

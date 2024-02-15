@@ -5,6 +5,7 @@ mod interrupt;
 mod gpu;
 
 use num_traits::FromPrimitive;
+use num_traits::WrappingSub;
 use registers::Registers;
 use registers::Flag;
 use memory::Memory;
@@ -47,7 +48,7 @@ impl CPU {
 
     pub fn decode(&mut self, byte: u8) -> u8 {
 
-        println!("[{:#06x}] {:#04x}", self.registers.read_pc() - 1, byte);
+        // println!("[{:#06x}] {:#04x}", self.registers.read_pc() - 1, byte);
 
         match byte {
             /*
@@ -187,7 +188,6 @@ impl CPU {
                         (1, old)
                     }
                 };
-
                 self.registers.write_flag(&Flag::Z, old_value.wrapping_sub(1) == 0);
                 self.registers.set_flag(&Flag::N);
                 self.registers.write_flag(&Flag::H, old_value & 0xf == 0);
@@ -613,7 +613,7 @@ impl CPU {
 
                 self.registers.write_flag(&Flag::C, overflow);
                 self.registers.write_flag(&Flag::Z, result == 0);
-                self.registers.write_flag(&Flag::H, ((a & 0xf) - (value & 0xf)) & (0xf + 1) != 0);
+                self.registers.write_flag(&Flag::H, ((a & 0xf).wrapping_sub(value & 0xf)) & (0xf + 1) != 0);
                 self.registers.set_flag(&Flag::N);
                 2
             },
@@ -629,7 +629,7 @@ impl CPU {
 
                 self.registers.write_flag(&Flag::C, overflow);
                 self.registers.write_flag(&Flag::Z, result == 0);
-                self.registers.write_flag(&Flag::H, ((a & 0xf) - ((value + carry) & 0xf)) & (0xf + 1) != 0);
+                self.registers.write_flag(&Flag::H, ((a & 0xf).wrapping_sub((value + carry) & 0xf)) & (0xf + 1) != 0);
                 self.registers.set_flag(&Flag::N);
                 2
             },
@@ -1049,19 +1049,19 @@ impl CPU {
         
         if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::VBlank){
             self.jump_interrupt(0x40);
-            self.memory.get_interrupts().write_interrupt_flag(&interrupt::InterruptHandler::VBlank, false);
+            self.memory.get_interrupts().write_bit_interrupt_flag(&interrupt::InterruptHandler::VBlank, false);
         } else if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::LCD) {
             self.jump_interrupt(0x48);
-            self.memory.get_interrupts().write_interrupt_flag(&interrupt::InterruptHandler::LCD, false);
+            self.memory.get_interrupts().write_bit_interrupt_flag(&interrupt::InterruptHandler::LCD, false);
         } else if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::Timer) {
             self.jump_interrupt(0x50);
-            self.memory.get_interrupts().write_interrupt_flag(&interrupt::InterruptHandler::Timer, false);
+            self.memory.get_interrupts().write_bit_interrupt_flag(&interrupt::InterruptHandler::Timer, false);
         } else if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::Serial){
             self.jump_interrupt(0x58);
-            self.memory.get_interrupts().write_interrupt_flag(&interrupt::InterruptHandler::Serial, false);
+            self.memory.get_interrupts().write_bit_interrupt_flag(&interrupt::InterruptHandler::Serial, false);
         } else if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::Joypad) {
             self.jump_interrupt(0x60);
-            self.memory.get_interrupts().write_interrupt_flag(&interrupt::InterruptHandler::Joypad, false);
+            self.memory.get_interrupts().write_bit_interrupt_flag(&interrupt::InterruptHandler::Joypad, false);
         }
     }
 }
