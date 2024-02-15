@@ -117,7 +117,7 @@ impl CPU {
                 let result = hl_content.wrapping_add(reg_content);
                 self.registers.write_double_register(&DoubleRegister::HL, result);
                 self.registers.unset_flag(&Flag::N);
-                self.registers.write_flag(&Flag::H, hl_content & 0xfff + reg_content & 0xfff > 0xfff);
+                self.registers.write_flag(&Flag::H, (hl_content & 0xfff) + (reg_content & 0xfff) > 0xfff);
                 self.registers.write_flag(&Flag::C, hl_content > 0xffff - reg_content);
                 2
             },
@@ -598,7 +598,7 @@ impl CPU {
 
                 self.registers.write_flag(&Flag::C, overflow);
                 self.registers.write_flag(&Flag::Z, result == 0);
-                self.registers.write_flag(&Flag::H, (a & 0x0f) + ((value + carry) & 0x0f) > 0x0f);
+                self.registers.write_flag(&Flag::H, (a & 0x0f).wrapping_add((value.wrapping_add(carry)) & 0x0f) > 0x0f);
                 self.registers.unset_flag(&Flag::N);
                 2
             },
@@ -624,12 +624,12 @@ impl CPU {
                 let a = self.registers.read_register(&Register::A);
                 let carry = self.registers.read_flag(&Flag::C) as u8;
 
-                let (result, overflow )= a.overflowing_sub(value + carry);
+                let (result, overflow )= a.overflowing_sub(value.wrapping_add(carry));
                 self.registers.write_register(&Register::A, result);
 
                 self.registers.write_flag(&Flag::C, overflow);
                 self.registers.write_flag(&Flag::Z, result == 0);
-                self.registers.write_flag(&Flag::H, ((a & 0xf).wrapping_sub((value + carry) & 0xf)) & (0xf + 1) != 0);
+                self.registers.write_flag(&Flag::H, ((a & 0xf).wrapping_sub((value.wrapping_add(carry)) & 0xf)) & (0xf + 1) != 0);
                 self.registers.set_flag(&Flag::N);
                 2
             },
