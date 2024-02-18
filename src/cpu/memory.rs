@@ -71,22 +71,14 @@ impl Memory {
             interrupt: Interrupt::new(),
             gpu: GPU::new()
         };
-
-        memory.load_rom();
-
         memory
     }
 
 
-    pub fn load_rom(&mut self) {
-        let data = fs::read("roms/03-op sp,hl.gb").expect("Rom image not found!");
+    pub fn load_rom(&mut self, data: Vec<u8>) {
         let (bank_0, bank_1) = data.split_at(0x4000);
         self.rom_bank_0.copy_from_slice(bank_0);
         self.rom_bank_n.copy_from_slice(bank_1);
-    }
-
-    fn read_bootrom(&self, address: u16) -> u8 {
-        self.bootrom.read(address)
     }
 
     fn read_rom_bank_0(&self, address: u16) -> u8 {
