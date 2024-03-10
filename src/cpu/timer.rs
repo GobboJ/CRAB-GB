@@ -69,7 +69,8 @@ impl Timer {
             self.div = self.div.wrapping_add(1);
         }
 
-        let interrupt = if self.is_enabled() {
+        
+        if self.is_enabled() {
             self.timer_counter = self.timer_counter.wrapping_add(4 * cycles as u16);
 
             let limit_cycles = self.get_frequency().to_cycles();
@@ -88,8 +89,7 @@ impl Timer {
                 false
             }
         } else {
-            return false;
-        };
-        interrupt
+            false
+        }
     }
 }

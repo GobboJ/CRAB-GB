@@ -137,7 +137,7 @@ impl GPU {
                 // Drawing pixels
                 if self.scanline_counter >= 172 {
                     self.scanline_counter %= 172;
-                    self.lcd_status = (self.lcd_status & !0b11) | 0b00;
+                    self.lcd_status &= !0b11;
                     if (self.lcd_status >> 3) & 1 == 1 {
                         request_lcd = true;
                     }
@@ -155,6 +155,6 @@ impl GPU {
             self.lcd_status &= !0b100;
         }
         
-        return (request_vblank, request_lcd)
+        (request_vblank, request_lcd)
     } 
 }

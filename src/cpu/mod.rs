@@ -5,8 +5,6 @@ mod interrupt;
 mod gpu;
 
 use num_traits::FromPrimitive;
-use num_traits::WrappingAdd;
-use num_traits::WrappingSub;
 use registers::Registers;
 use registers::Flag;
 use memory::Memory;
@@ -39,10 +37,8 @@ impl CPU {
         loop {
             let mut cycles = 0;
 
-            if self.halted {
-                if self.memory.get_interrupts().is_pending() {
-                    self.halted = false;
-                }  
+            if self.halted && self.memory.get_interrupts().is_pending() {
+                self.halted = false;
             }
 
             if !self.halted {
@@ -73,12 +69,15 @@ impl CPU {
     pub fn decode(&mut self, byte: u8) -> u8 {
 
         // println!("[{:#06x}] {:#04x}", self.registers.read_pc() - 1, byte);
-        if (self.enable_interrupts == true) {
+        if self.enable_interrupts {
             self.ime = true;
             self.enable_interrupts = false;
         }
 
-        let cycles = match byte {
+        
+
+
+        match byte {
             /*
                 GROUP 00
             */
@@ -190,7 +189,7 @@ impl CPU {
                     },
                     _ => {
                         let old = self.registers.read_register(register);
-                        self.registers.write_register(&register, old.wrapping_add(1));
+                        self.registers.write_register(register, old.wrapping_add(1));
                         (1, old)
                     }
                 };
@@ -212,7 +211,7 @@ impl CPU {
                     },
                     _ => {
                         let old = self.registers.read_register(register);
-                        self.registers.write_register(&register, old.wrapping_sub(1));
+                        self.registers.write_register(register, old.wrapping_sub(1));
                         (1, old)
                     }
                 };
@@ -230,7 +229,7 @@ impl CPU {
                     self.memory.write(self.registers.read_double_register(&DoubleRegister::HL), n);
                     3
                 } else { 
-                    self.registers.write_register(&register, n);
+                    self.registers.write_register(register, n);
                     2 
                 }
             },
@@ -354,7 +353,7 @@ impl CPU {
                         2
                     },
                     _ => {
-                        self.registers.write_register(&dest, data);
+                        self.registers.write_register(dest, data);
                         1
                     }
                 };
@@ -1104,10 +1103,7 @@ impl CPU {
                 }
             }           
             _ => panic!("Unrecognized instruction: {}", byte)
-        };
-
-
-        cycles
+        }
     }
 
     fn jump_interrupt(&mut self, target: u16) {

@@ -58,7 +58,8 @@ pub struct Memory {
 impl Memory {
 
     pub fn new() -> Memory {
-        let mut memory = Memory {
+        
+        Memory {
             bootrom: Bootrom::new(),
             rom_bank_0: [0; 0x4000],
             rom_bank_n: [0; 0x4000],
@@ -70,8 +71,7 @@ impl Memory {
             timer: Timer::new(),
             interrupt: Interrupt::new(),
             gpu: GPU::new()
-        };
-        memory
+        }
     }
 
 
@@ -165,13 +165,13 @@ impl Memory {
 
 
     fn handle_read_io_register(&self, address: u16) -> u8 {
-        let res = match address {
+        
+        // println!("[IO REA] {:#06x} = {}", address, res);
+        match address {
             0xFF0F => self.interrupt.read_interrupt_flag(),
             0xFF44 => self.gpu.read_ly(),
             x => panic!("Reading unknown IO Register {:x}", x)
-        };
-        // println!("[IO REA] {:#06x} = {}", address, res);
-        res
+        }
     }
 
     fn handle_write_io_register(&mut self, address: u16, data: u8) {
