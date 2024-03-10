@@ -21,23 +21,16 @@ impl Interrupt {
         self.interrupt_enable
     }
 
+    pub fn read_interrupt_flag(&self) -> u8 {
+        self.interrupt_flag
+    }
+
     pub fn write_interrupt_enable(&mut self, value: u8) {
         self.interrupt_enable = value;
     }
 
     pub fn write_interrupt_flag(&mut self, value: u8) {
         self.interrupt_flag = value;
-    }
-
-    pub fn write_bit_interrupt_enable(&mut self, interrupt: &InterruptHandler, value: bool) {
-        let bit = value as u8;
-        match interrupt {
-            InterruptHandler::VBlank => self.interrupt_enable = (self.interrupt_enable & !1) | bit,
-            InterruptHandler::LCD => self.interrupt_enable = (self.interrupt_enable & !(1 << 1)) | (bit << 1),
-            InterruptHandler::Timer => self.interrupt_enable = (self.interrupt_enable & !(1 << 2)) | (bit << 2),
-            InterruptHandler::Serial => self.interrupt_enable = (self.interrupt_enable & !(1 << 3)) | (bit << 3),
-            InterruptHandler::Joypad => self.interrupt_enable = (self.interrupt_enable & !(1 << 4)) | (bit << 4),
-        }
     }
 
     pub fn write_bit_interrupt_flag(&mut self, interrupt: &InterruptHandler, value: bool) {
@@ -73,5 +66,9 @@ impl Interrupt {
 
     pub fn is_enabled_and_requested(&self, interrupt: &InterruptHandler) -> bool {
         self.is_enabled(interrupt) && self.is_requested(interrupt)
+    }
+
+    pub fn is_pending(&self) -> bool {
+        self.interrupt_enable & self.interrupt_flag != 0
     }
 }

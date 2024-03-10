@@ -166,6 +166,7 @@ impl Memory {
 
     fn handle_read_io_register(&self, address: u16) -> u8 {
         let res = match address {
+            0xFF0F => self.interrupt.read_interrupt_flag(),
             0xFF44 => self.gpu.read_ly(),
             x => panic!("Reading unknown IO Register {:x}", x)
         };
@@ -178,6 +179,7 @@ impl Memory {
         match address {
             0xFF01 => print!("{}", data as char),
             0xFF02 => {},
+            0xFF05 => self.timer.write_tima(data),
             0xFF07 => self.timer.write_tac(data),
             0xFF0F => self.interrupt.write_interrupt_flag(data),
             0xFF10..=0xFF26 => {}, // Audio
@@ -195,12 +197,16 @@ impl Memory {
     }
 
     pub fn update_timer(&mut self, cycles: u8) {
-        self.timer.update(cycles);
+        let interrupt = self.timer.update(cycles);
+        if interrupt {
+            self.get_interrupts().write_bit_interrupt_flag(&super::interrupt::InterruptHandler::Timer, true);
+        }
     }
 
     pub fn update_gpu(&mut self, cycles: u8) {
         let (vblank, lcd) = self.gpu.update(cycles);
         if vblank {
+            // println!("SET VBLANK INTERRUPT FLAG");
             self.get_interrupts().write_bit_interrupt_flag(&super::interrupt::InterruptHandler::VBlank, true);
         }
         if lcd {

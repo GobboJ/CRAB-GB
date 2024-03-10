@@ -18,8 +18,9 @@ pub struct CPU {
 
     registers: Registers,
     memory: Memory,
-    enable_interrupts: bool
-   
+    enable_interrupts: bool,
+    ime: bool,
+    halted: bool
 }
 
 impl CPU {
@@ -28,18 +29,36 @@ impl CPU {
         CPU {
             registers: Registers::new(),
             memory: Memory::new(),
-            enable_interrupts: false
+            enable_interrupts: false,
+            ime: false,
+            halted: false
         }
     }
 
     pub fn run(&mut self) {
         loop {
-            let byte = self.memory.read(self.registers.read_pc());
-            self.registers.increase_pc();
-            let cycles = self.decode(byte);
+            let mut cycles = 0;
 
-            if self.enable_interrupts {
-                self.handle_interrupts();
+            if self.halted {
+                if self.memory.get_interrupts().is_pending() {
+                    self.halted = false;
+                }  
+            }
+
+            if !self.halted {
+                if self.ime {
+                    let interrupt = self.handle_interrupts();
+                    if interrupt {
+                        cycles += 4;
+                    }
+                }
+            
+                let byte = self.memory.read(self.registers.read_pc());
+                self.registers.increase_pc();
+                cycles += self.decode(byte);
+                
+            } else {
+                cycles = 1;
             }
 
             self.memory.update_timer(cycles);
@@ -47,11 +66,19 @@ impl CPU {
         }
     }
 
+    pub fn load_rom(&mut self, data: Vec<u8>) {
+        self.memory.load_rom(data);
+    }
+
     pub fn decode(&mut self, byte: u8) -> u8 {
 
         // println!("[{:#06x}] {:#04x}", self.registers.read_pc() - 1, byte);
+        if (self.enable_interrupts == true) {
+            self.ime = true;
+            self.enable_interrupts = false;
+        }
 
-        match byte {
+        let cycles = match byte {
             /*
                 GROUP 00
             */
@@ -233,7 +260,7 @@ impl CPU {
                 self.registers.unset_flag(&Flag::Z);
                 self.registers.unset_flag(&Flag::N);
                 self.registers.unset_flag(&Flag::H);
-                self.registers.write_flag(&Flag::C, (a_value >> 7) & 0b10000000 == 1);
+                self.registers.write_flag(&Flag::C, (a_value >> 7) & 1 == 1);
                 1
             },
             0x1F => {
@@ -249,7 +276,32 @@ impl CPU {
             },
             0x27 => {
                 // DAA
-                todo!()
+                let mut a_value= self.registers.read_register(&Register::A);
+                if !self.registers.read_flag(&Flag::N) {
+                    if self.registers.read_flag(&Flag::C) || a_value > 0x99 {
+                        self.registers.set_flag(&Flag::C);
+                        a_value = a_value.wrapping_add(0x60);
+                    }
+
+                    if self.registers.read_flag(&Flag::H) || a_value & 0x0F > 0x09 {
+                        a_value = a_value.wrapping_add(0x06);
+                    }
+                } else if self.registers.read_flag(&Flag::C) {
+                    self.registers.set_flag(&Flag::C);
+                    if self.registers.read_flag(&Flag::H) {
+                        a_value = a_value.wrapping_add(0x9A);
+                    } else {
+                        a_value = a_value.wrapping_add(0xA0);
+                    }
+                } else if self.registers.read_flag(&Flag::H) {
+                    a_value = a_value.wrapping_add(0xFA);
+                }
+
+                self.registers.write_flag(&Flag::Z, a_value == 0);
+                self.registers.unset_flag(&Flag::H);
+
+                self.registers.write_register(&Register::A, a_value);
+                1
             },
             0x2F => {
                 // CPL
@@ -278,7 +330,8 @@ impl CPU {
             */
             0x76 => {
                 // HALT
-                todo!();
+                self.halted = true;
+                1
             },
             0x40..=0x7F => {
                 // LD r8, r8
@@ -339,13 +392,13 @@ impl CPU {
                     _ => (1, self.registers.read_register(register)),
                 };
 
-                let (result, overflow)= a.overflowing_add(data.wrapping_add(carry));
+                let result= a.wrapping_add(data).wrapping_add(carry);
                 self.registers.write_register(&Register::A, result);
 
                 self.registers.write_flag(&Flag::Z, result == 0);
                 self.registers.unset_flag(&Flag::N);
-                self.registers.write_flag(&Flag::H, (a & 0x0f) + (data & 0x0f + carry) > 0x0f);
-                self.registers.write_flag(&Flag::C, overflow);
+                self.registers.write_flag(&Flag::H, (a & 0x0f) + (data & 0x0f) + carry > 0xf);
+                self.registers.write_flag(&Flag::C, (a as u16) + (data as u16) + (carry as u16) > 0xff);
                 cycles
             },
             0x90..=0x97 => {
@@ -376,13 +429,13 @@ impl CPU {
                     _ => (1, self.registers.read_register(register)),
                 };
 
-                let (result, overflow )= a.overflowing_sub(data.wrapping_sub(carry));
+                let result = a.wrapping_sub(data).wrapping_sub(carry);
                 self.registers.write_register(&Register::A, result);
 
                 self.registers.write_flag(&Flag::Z, result == 0);
                 self.registers.set_flag(&Flag::N);
                 self.registers.write_flag(&Flag::H, ((a & 0xf).wrapping_sub(data & 0xf).wrapping_sub(carry)) & (0xf + 1) != 0);
-                self.registers.write_flag(&Flag::C, overflow);
+                self.registers.write_flag(&Flag::C, (a as u16) < (data as u16) + (carry as u16));
                 cycles
             },
             0xA0..=0xA7 => {
@@ -500,7 +553,14 @@ impl CPU {
             },
             0xD9 => {
                 // RETI
-                todo!()
+                self.enable_interrupts = true;
+                let low_data = self.memory.read(self.registers.read_double_register(&DoubleRegister::SP));
+                self.registers.increase_sp(1);
+                let high_data = self.memory.read(self.registers.read_double_register(&DoubleRegister::SP));
+                self.registers.increase_sp(1);
+                self.registers.write_pc(((high_data as u16) << 8) | low_data as u16);
+                4
+
             },
             0xC2 | 0xCA | 0xD2 | 0xDA => {
                 // JP cond, u16
@@ -594,13 +654,13 @@ impl CPU {
                 let a = self.registers.read_register(&Register::A);
                 let carry = self.registers.read_flag(&Flag::C) as u8;
 
-                let (result, overflow)= a.overflowing_add(value.wrapping_add(carry));
+                let result= a.wrapping_add(value).wrapping_add(carry);
                 self.registers.write_register(&Register::A, result);
 
-                self.registers.write_flag(&Flag::C, overflow);
                 self.registers.write_flag(&Flag::Z, result == 0);
-                self.registers.write_flag(&Flag::H, (a & 0x0f).wrapping_add((value.wrapping_add(carry)) & 0x0f) > 0x0f);
                 self.registers.unset_flag(&Flag::N);
+                self.registers.write_flag(&Flag::H, (a & 0x0f).wrapping_add(value & 0x0f).wrapping_add(carry) > 0x0f);
+                self.registers.write_flag(&Flag::C, a as u16 + value as u16 + carry as u16 > 0xff);
                 2
             },
             0xD6 => {
@@ -625,13 +685,13 @@ impl CPU {
                 let a = self.registers.read_register(&Register::A);
                 let carry = self.registers.read_flag(&Flag::C) as u8;
 
-                let (result, overflow )= a.overflowing_sub(value.wrapping_add(carry));
+                let result = a.wrapping_sub(value).wrapping_sub(carry);
                 self.registers.write_register(&Register::A, result);
 
-                self.registers.write_flag(&Flag::C, overflow);
                 self.registers.write_flag(&Flag::Z, result == 0);
-                self.registers.write_flag(&Flag::H, ((a & 0xf).wrapping_sub((value.wrapping_add(carry)) & 0xf)) & (0xf + 1) != 0);
                 self.registers.set_flag(&Flag::N);
+                self.registers.write_flag(&Flag::H, (a & 0xf).wrapping_sub(value & 0xf).wrapping_sub(carry) & (0xf + 1) != 0);
+                self.registers.write_flag(&Flag::C, (a as u16) < (value as u16) + (carry as u16));
                 2
             },
             0xE6 => {
@@ -692,7 +752,15 @@ impl CPU {
             },
             0xC7 | 0xCF | 0xD7 | 0xDF | 0xE7 | 0xEF | 0xF7 | 0xFF => {
                 // RST tgt3
-                todo!()
+                let target= ((byte >> 3) & 0b111) as u16 * 8;
+
+                self.registers.decrement_sp(1);
+                self.memory.write(self.registers.read_double_register(&DoubleRegister::SP), (self.registers.read_pc() >> 8) as u8);
+                self.registers.decrement_sp(1);
+                self.memory.write(self.registers.read_double_register(&DoubleRegister::SP), self.registers.read_pc() as u8);
+                self.registers.write_pc(target);
+                
+                4
             },
             0xE0 => {
                 // LD (FF00+u8), A
@@ -790,12 +858,12 @@ impl CPU {
             },
             0xF3 => {
                 // DI
-                self.enable_interrupts = false;
+                self.ime = false;
                 1
             },
             0xFB => {
                 // EI
-                self.enable_interrupts = true; // TODO Enable after the next instruction
+                self.enable_interrupts = true;
                 1
             },
             
@@ -834,13 +902,15 @@ impl CPU {
                         let (cycles, result) = match register {
                             Register::HL => {
                                 let r = self.memory.read(self.registers.read_double_register(&DoubleRegister::HL));
-                                self.memory.write(self.registers.read_double_register(&DoubleRegister::HL), r.rotate_right(1));
-                                (4, r)
+                                let result = r.rotate_right(1);
+                                self.memory.write(self.registers.read_double_register(&DoubleRegister::HL), result);
+                                (4, result)
                             },
                             _ => {
                                 let r = self.registers.read_register(register);
-                                self.registers.write_register(register, r.rotate_right(1));
-                                (2, r)
+                                let result = r.rotate_right(1);
+                                self.registers.write_register(register, result);
+                                (2, result)
                             }
                         };
                         self.registers.write_flag(&Flag::Z, result == 0);
@@ -1034,7 +1104,10 @@ impl CPU {
                 }
             }           
             _ => panic!("Unrecognized instruction: {}", byte)
-        }
+        };
+
+
+        cycles
     }
 
     fn jump_interrupt(&mut self, target: u16) {
@@ -1046,9 +1119,9 @@ impl CPU {
         self.registers.write_pc(target);
     }
 
-    fn handle_interrupts(&mut self) {
-        self.enable_interrupts = false;
-        
+    fn handle_interrupts(&mut self) -> bool {
+
+        let mut interrupted = true;
         if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::VBlank){
             self.jump_interrupt(0x40);
             self.memory.get_interrupts().write_bit_interrupt_flag(&interrupt::InterruptHandler::VBlank, false);
@@ -1064,6 +1137,10 @@ impl CPU {
         } else if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::Joypad) {
             self.jump_interrupt(0x60);
             self.memory.get_interrupts().write_bit_interrupt_flag(&interrupt::InterruptHandler::Joypad, false);
+        } else {
+            interrupted = false;
         }
+
+        interrupted
     }
 }

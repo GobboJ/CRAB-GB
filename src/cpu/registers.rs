@@ -168,7 +168,7 @@ impl Registers {
             },
             DoubleRegisterStack::AF => {
                 self.a = (value >> 8) as u8;
-                self.f = value as u8;
+                self.f = (value as u8) & 0xf0;
             },
         }
     }
