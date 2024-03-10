@@ -180,6 +180,7 @@ impl Memory {
             0xFF01 => print!("{}", data as char),
             0xFF02 => {},
             0xFF05 => self.timer.write_tima(data),
+            0xFF06 => self.timer.write_tma(data),
             0xFF07 => self.timer.write_tac(data),
             0xFF0F => self.interrupt.write_interrupt_flag(data),
             0xFF10..=0xFF26 => {}, // Audio
