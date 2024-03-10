@@ -188,6 +188,11 @@ impl Memory {
             0xFF41 => self.gpu.write_lcd_status(data),
             0xFF42 => self.gpu.write_scy(data),
             0xFF43 => self.gpu.write_scx(data),
+            0xFF46 => {
+                let source = data * 100;
+                let data: Vec<u8> = (0..0xA0).map(|i| {self.read(source as u16 + i)}).collect();
+                self.gpu.oam_dma(&data);
+            }
             0xFF47 => self.gpu.write_bgp(data),
             0xFF50 => {
                 println!("Disabled bootrom!");

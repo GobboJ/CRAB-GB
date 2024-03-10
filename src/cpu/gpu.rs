@@ -34,7 +34,7 @@ impl GPU {
     }
 
     pub fn write_lcd_control(&mut self, data: u8) {
-        self.lcd_control = data; // TODO Check bit by bit
+        self.lcd_control = data;
     }
 
     pub fn write_scy(&mut self, data: u8) {
@@ -63,6 +63,12 @@ impl GPU {
 
     pub fn write_vram(&mut self, address: u16, data: u8) {
         self.vram[address as usize] = data;
+    }
+
+    pub fn oam_dma(&mut self, data: &[u8]) {
+        for i in 0..0xA0 {
+            self.oam[i] = data[i];
+        }
     }
 
     pub fn update(&mut self, cycles: u8) -> (bool, bool) {
