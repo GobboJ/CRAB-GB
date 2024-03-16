@@ -33,6 +33,10 @@ impl GPU {
         GPU { vram: [0; 0x2000], oam: [0; 0x00A0], scanline_counter: 0, lcd_control: 0, lcd_status: 0, scy: 0, scx: 0, ly: 0, lyc: 0, dma: 0, bgp: 0, obp0: 0, obp1: 0, wy: 0, wx: 0 }
     }
 
+    pub fn read_lcd_control(&self) -> u8 {
+        self.lcd_control
+    }
+
     pub fn write_lcd_control(&mut self, data: u8) {
         self.lcd_control = data;
     }
@@ -43,6 +47,14 @@ impl GPU {
 
     pub fn write_scx(&mut self, data: u8) {
         self.scx = data;
+    }
+
+    pub fn write_obp0(&mut self, data: u8) {
+        self.obp0 = data;
+    }
+
+    pub fn write_obp1(&mut self, data: u8) {
+        self.obp1 = data;
     }
 
     pub fn write_bgp(&mut self, data: u8) {
@@ -63,6 +75,18 @@ impl GPU {
 
     pub fn write_vram(&mut self, address: u16, data: u8) {
         self.vram[address as usize] = data;
+    }
+
+    pub fn write_oam(&mut self, address: u16, data: u8) {
+        self.oam[address as usize] = data;
+    }
+
+    pub fn write_wy(&mut self, data: u8) {
+        self.wy = data;
+    }
+
+    pub fn write_wx(&mut self, data: u8) {
+        self.wx = data;
     }
 
     pub fn oam_dma(&mut self, data: &[u8]) {
@@ -163,4 +187,18 @@ impl GPU {
         
         (request_vblank, request_lcd)
     } 
+
+
+    fn scan_line(&mut self) {
+
+        // Draw Background
+        if self.lcd_control & 1 == 1 {
+            
+        }
+
+        // Draw sprites
+        if (self.lcd_control >> 1) & 1 == 1 {
+            
+        }
+    }
 }

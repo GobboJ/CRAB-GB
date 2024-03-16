@@ -153,9 +153,12 @@ impl Memory {
 
     pub fn write(&mut self, address: u16, data: u8) {
         match address {
+            0x0000..=0x7FFF => {},
             0x8000..=0x9FFF => self.write_video_ram(address - 0x8000, data),
             0xA000..=0xBFFF => self.write_external_ram(address - 0xA000, data),
             0xC000..=0xDFFF => self.write_work_ram(address - 0xC000, data),
+            0xFE00..=0xFE9F => self.gpu.write_oam(address - 0xFE00, data),
+            0xFEA0..=0xFEFF => {},
             0xFF00..=0xFF7F => self.handle_write_io_register(address, data),
             0xFF80..=0xFFFE => self.write_high_ram(address - 0xFF80, data),
             0xFFFF => self.interrupt.write_interrupt_enable(data),
@@ -168,7 +171,12 @@ impl Memory {
         
         // println!("[IO REA] {:#06x} = {}", address, res);
         match address {
+            0xFF00 => {
+                // TODO Joypad
+                0
+            },
             0xFF0F => self.interrupt.read_interrupt_flag(),
+            0xFF40 => self.gpu.read_lcd_control(),
             0xFF44 => self.gpu.read_ly(),
             x => panic!("Reading unknown IO Register {:x}", x)
         }
@@ -177,6 +185,9 @@ impl Memory {
     fn handle_write_io_register(&mut self, address: u16, data: u8) {
         // println!("[IO WRI] {:#06x} = {:#04x}", address, data);
         match address {
+            0xFF00 => {
+                // TODO Joypad
+            },
             0xFF01 => print!("{}", data as char),
             0xFF02 => {},
             0xFF05 => self.timer.write_tima(data),
@@ -189,15 +200,20 @@ impl Memory {
             0xFF42 => self.gpu.write_scy(data),
             0xFF43 => self.gpu.write_scx(data),
             0xFF46 => {
-                let source = data * 100;
-                let data: Vec<u8> = (0..0xA0).map(|i| {self.read(source as u16 + i)}).collect();
+                let source: u16 = data as u16 * 100;
+                let data: Vec<u8> = (0..0xA0).map(|i| {self.read(source + i)}).collect();
                 self.gpu.oam_dma(&data);
-            }
+            },
             0xFF47 => self.gpu.write_bgp(data),
+            0xFF48 => self.gpu.write_obp0(data),
+            0xFF49 => self.gpu.write_obp1(data),
+            0xFF4A => self.gpu.write_wy(data),
+            0xFF4B => self.gpu.write_wx(data),
             0xFF50 => {
                 println!("Disabled bootrom!");
                 self.bootrom.set_disable();
             },
+            0xFF7F => {},
             x => panic!("Writing unknown IO Register {:x}", x)
         }
     }
