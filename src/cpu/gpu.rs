@@ -1,5 +1,8 @@
+use core::panic;
+
 pub struct GPU {
 
+    framebuffer: [u8; 160*144*3],
     vram: [u8; 0x2000],
     oam: [u8; 0x00A0],
     scanline_counter: u16,
@@ -30,7 +33,7 @@ pub struct GPU {
 impl GPU {
     pub fn new() -> GPU {
 
-        GPU { vram: [0; 0x2000], oam: [0; 0x00A0], scanline_counter: 0, lcd_control: 0, lcd_status: 0, scy: 0, scx: 0, ly: 0, lyc: 0, dma: 0, bgp: 0, obp0: 0, obp1: 0, wy: 0, wx: 0 }
+        GPU { framebuffer: [0xFF; 160*144*3], vram: [0; 0x2000], oam: [0; 0x00A0], scanline_counter: 0, lcd_control: 0, lcd_status: 0, scy: 0, scx: 0, ly: 0, lyc: 0, dma: 0, bgp: 0, obp0: 0, obp1: 0, wy: 0, wx: 0 }
     }
 
     pub fn read_lcd_control(&self) -> u8 {
@@ -172,6 +175,7 @@ impl GPU {
                         request_lcd = true;
                     }
                 }
+                self.scan_line()
             }
             _ => panic!("Unexpected LCD status: {}", self.lcd_status)
         }
@@ -191,9 +195,83 @@ impl GPU {
 
     fn scan_line(&mut self) {
 
+        let mut window = false;
+        let mut baseTileAddress: u16 = 0x8000;
+        let mut tileMapAddress: u16 = 0x9800;
+        
         // Draw Background
         if self.lcd_control & 1 == 1 {
-            
+
+            // Window is enabled
+            if (self.lcd_control >> 5) & 1 == 1 {
+                if self.wy <= self.ly {
+                    window = true;
+                }
+            }
+
+            if (self.lcd_control >> 4) & 1 == 0 {
+                baseTileAddress = 0x8800;
+            }
+
+            if window {
+                if (self.lcd_control >> 6) & 1 == 1 {
+                    tileMapAddress = 0x9C00;
+                }
+            } else {
+                if (self.lcd_control >> 3) & 1 == 1 {
+                    tileMapAddress = 0x9C00;
+                }
+            }
+
+            let y_tilemap = if window {
+                self.ly - self.wy
+            } else {
+                self.scy + self.ly
+            };
+
+            let y_tile = (y_tilemap / 8).overflowing_mul(32).0;
+
+            for p in 0u8..160 {
+                let mut x_tilemap = p.overflowing_add(self.scx).0;
+
+                if window {
+                    if p >= self.wx {
+                        x_tilemap = p - self.wx;
+                    }
+                }
+
+                let x_tile = x_tilemap / 8;
+
+                let tile_id = self.vram[(tileMapAddress + y_tile as u16 + x_tile as u16 - 0x8000) as usize];
+
+                let tile_address = if baseTileAddress == 0x8800 {
+                    baseTileAddress + (tile_id as u16 * 16)
+                } else {
+                    baseTileAddress + ((tile_id as u16 + 128) * 16)
+                };
+
+                let line = (y_tilemap % 8) * 2;
+                let data_1 = self.vram[(tile_address + (line as u16)) as usize - 0x8000];
+                let data_2 = self.vram[(tile_address + (line as u16) + 1) as usize - 0x8000];
+
+                let mask = (((x_tilemap % 8) as i8 - 7) * -1) as u8;
+
+                let color_id = ((data_2 >> mask) & 1) << 1 | ((data_1 >> mask) & 1);
+
+                let color = (self.bgp >> (color_id * 2)) & 0b11;
+
+                let (r,g,b) = match color {
+                    0 => (255,255,255),
+                    1 => (0xCC,0xCC,0xCC),
+                    2 => (0x77,0x77,0x77),
+                    3 => (0,0,0),
+                    _ => panic!("Unexpected color: {}", color)
+                };
+
+                self.framebuffer[(self.ly as usize * 160 * 3) + (p as usize * 3)] = r;
+                self.framebuffer[(self.ly as usize * 160 * 3) + (p as usize * 3) + 1] = g;
+                self.framebuffer[(self.ly as usize * 160 * 3) + (p as usize * 3) + 2] = b;
+            }
         }
 
         // Draw sprites
