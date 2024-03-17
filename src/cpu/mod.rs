@@ -33,8 +33,9 @@ impl CPU {
         }
     }
 
-    pub fn run(&mut self) {
-        loop {
+    pub fn update(&mut self) {
+        let mut totalCycles = 0;
+        while totalCycles < 69905 {
             let mut cycles = 0;
 
             if self.halted && self.memory.get_interrupts().is_pending() {
@@ -59,7 +60,13 @@ impl CPU {
 
             self.memory.update_timer(cycles);
             self.memory.update_gpu(cycles);
+
+            totalCycles += cycles as usize;
         }
+    }
+
+    pub fn get_framebuffer(&self) -> [u8; 160*144*4] {
+        self.memory.get_gpu().framebuffer
     }
 
     pub fn load_rom(&mut self, data: Vec<u8>) {

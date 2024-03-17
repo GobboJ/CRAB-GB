@@ -177,6 +177,8 @@ impl Memory {
             },
             0xFF0F => self.interrupt.read_interrupt_flag(),
             0xFF40 => self.gpu.read_lcd_control(),
+            0xFF41 => self.gpu.read_lcd_status(),
+            0xFF42 => self.gpu.read_scy(),
             0xFF44 => self.gpu.read_ly(),
             x => panic!("Reading unknown IO Register {:x}", x)
         }
@@ -238,5 +240,9 @@ impl Memory {
 
     pub fn get_interrupts(&mut self) -> &mut Interrupt {
         &mut self.interrupt
+    }
+
+    pub fn get_gpu(&self) -> &GPU {
+        &self.gpu
     }
 }
