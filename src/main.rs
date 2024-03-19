@@ -9,6 +9,8 @@ use winit::{event_loop::EventLoop, dpi::LogicalSize};
 use winit::window::WindowBuilder;
 use game_loop::game_loop;
 
+const WIDTH: u32 = 160;
+const HEIGHT: u32 = 144;
 
 fn read_rom(path: &str) -> Vec<u8> {
     fs::read(path).expect("File not found")
@@ -31,10 +33,11 @@ fn main() {
 
     let event_loop = EventLoop::new().unwrap();
     let window = Arc::new({
-        let size = LogicalSize::new(160, 144);
+        let size = LogicalSize::new(WIDTH, HEIGHT);
+        let scaled_size = LogicalSize::new(WIDTH * 3, HEIGHT * 3);
         WindowBuilder::new()
             .with_title(format!("CRAB-GB [{}]", &args[1]))
-            .with_inner_size(size)
+            .with_inner_size(scaled_size)
             .with_min_inner_size(size)
             .build(&event_loop)
             .unwrap()
