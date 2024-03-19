@@ -1,4 +1,5 @@
 use core::panic;
+use std::ffi::FromBytesUntilNulError;
 
 pub struct GPU {
 
@@ -267,7 +268,8 @@ impl GPU {
                 let tile_address = if base_tile_address == 0x8000 {
                     base_tile_address + (tile_id as u16 * 16)
                 } else {
-                    base_tile_address + ((tile_id as u16 + 128) * 16)
+                    let tile_id = tile_id as i8 as i16;
+                    base_tile_address + ((tile_id + 128) as u16 * 16)
                 };
 
                 let line = (y_tilemap % 8) * 2;
@@ -296,62 +298,62 @@ impl GPU {
         }
 
         // Draw sprites
-        if (self.lcd_control >> 1) & 1 == 1 {
-            let tile_height = if (self.lcd_control >> 2) == 1 {
-                16
-            } else {
-                8
-            };
+        // if (self.lcd_control >> 1) & 1 == 1 {
+        //     let tile_height = if (self.lcd_control >> 2) == 1 {
+        //         16
+        //     } else {
+        //         8
+        //     };
 
 
-            for obj in 0..40 {
-                let index = obj * 4;
+        //     for obj in 0..40 {
+        //         let index = obj * 4;
 
-                let y_pos = self.oam[index].overflowing_sub(16).0;
-                let x_pos = self.oam[index + 1].overflowing_sub(8).0;
-                let tile_index = self.oam[index + 2];
-                let attributes = self.oam[index + 3];
+        //         let y_pos = self.oam[index].overflowing_sub(16).0;
+        //         let x_pos = self.oam[index + 1].overflowing_sub(8).0;
+        //         let tile_index = self.oam[index + 2];
+        //         let attributes = self.oam[index + 3];
                 
-                if (self.ly >= y_pos) && (self.ly < y_pos + tile_height) {
-                    let mut line = self.ly as i32 - y_pos as i32;
-                    if attributes >> 6 & 1 == 1 {
-                        line = (line - tile_height as i32) * -2;
-                    }
+        //         if (self.ly >= y_pos) && (self.ly < y_pos + tile_height) {
+        //             let mut line = self.ly as i32 - y_pos as i32;
+        //             if attributes >> 6 & 1 == 1 {
+        //                 line = (line - tile_height as i32) * -2;
+        //             }
 
-                    let data_1 = self.vram[(tile_index as usize) * 16 + line as usize];
-                    let data_2 = self.vram[(tile_index as usize) * 16 + line as usize + 1];
+        //             let data_1 = self.vram[(tile_index as usize) * 16 + line as usize];
+        //             let data_2 = self.vram[(tile_index as usize) * 16 + line as usize + 1];
 
-                    for pixel in (0..8).rev() {
-                        let mask = if attributes >> 5 & 1 == 1 {
-                            (((pixel % 8) as i8 - 7) * -1) as u8
-                        } else {
-                            pixel
-                        };
+        //             for pixel in (0..8).rev() {
+        //                 let mask = if attributes >> 5 & 1 == 1 {
+        //                     (((pixel % 8) as i8 - 7) * -1) as u8
+        //                 } else {
+        //                     pixel
+        //                 };
 
-                        let color_id = ((data_2 >> mask) & 1) << 1 | ((data_1 >> mask) & 1);
-                        let color = if attributes >> 4 & 1 == 1 {
-                            (self.obp1 >> (color_id * 2)) & 0b11
-                        } else {
-                            (self.obp0 >> (color_id * 2)) & 0b11
-                        };
+        //                 let color_id = ((data_2 >> mask) & 1) << 1 | ((data_1 >> mask) & 1);
+        //                 let color = if attributes >> 4 & 1 == 1 {
+        //                     (self.obp1 >> (color_id * 2)) & 0b11
+        //                 } else {
+        //                     (self.obp0 >> (color_id * 2)) & 0b11
+        //                 };
 
-                        let (r,g,b) = match color {
-                            0 => continue,
-                            1 => (0xCC,0xCC,0xCC),
-                            2 => (0x77,0x77,0x77),
-                            3 => (0,0,0),
-                            _ => panic!("Unexpected color: {}", color)
-                        };
+        //                 let (r,g,b) = match color {
+        //                     0 => continue,
+        //                     1 => (0xCC,0xCC,0xCC),
+        //                     2 => (0x77,0x77,0x77),
+        //                     3 => (0,0,0),
+        //                     _ => panic!("Unexpected color: {}", color)
+        //                 };
 
-                        let p = -(pixel as i32) + 7 + x_pos as i32;
+        //                 let p = -(pixel as i32) + 7 + x_pos as i32;
 
-                        self.framebuffer[(self.ly as usize * 160 * 4) + (p as usize * 4)] = r;
-                        self.framebuffer[(self.ly as usize * 160 * 4) + (p as usize * 4) + 1] = g;
-                        self.framebuffer[(self.ly as usize * 160 * 4) + (p as usize * 4) + 2] = b;
-                        self.framebuffer[(self.ly as usize * 160 * 4) + (p as usize * 4) + 3] = 0xFF;
-                    }
-                }
-            }
-        }
+        //                 self.framebuffer[(self.ly as usize * 160 * 4) + (p as usize * 4)] = r;
+        //                 self.framebuffer[(self.ly as usize * 160 * 4) + (p as usize * 4) + 1] = g;
+        //                 self.framebuffer[(self.ly as usize * 160 * 4) + (p as usize * 4) + 2] = b;
+        //                 self.framebuffer[(self.ly as usize * 160 * 4) + (p as usize * 4) + 3] = 0xFF;
+        //             }
+        //         }
+        //     }
+        // }
     }
 }
