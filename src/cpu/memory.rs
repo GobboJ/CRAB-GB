@@ -202,7 +202,7 @@ impl Memory {
             0xFF42 => self.gpu.write_scy(data),
             0xFF43 => self.gpu.write_scx(data),
             0xFF46 => {
-                let source: u16 = data as u16 * 100;
+                let source: u16 = (data as u16) << 8;
                 let data: Vec<u8> = (0..0xA0).map(|i| {self.read(source + i)}).collect();
                 self.gpu.oam_dma(&data);
             },
