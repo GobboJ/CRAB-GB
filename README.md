@@ -2,7 +2,7 @@
 
 A WIP GameBoy emulator made in Rust!
 
-It does not provide visual output at the moment.
+![screenshot](https://github.com/GobboJ/CRAB-GB/assets/11314515/259689ac-b317-46d3-9af1-36d00019e2a9)
 
 ## Tests
 
@@ -16,3 +16,4 @@ It does not provide visual output at the moment.
 - http://www.codeslinger.co.uk/pages/projects/gameboy.html
 - https://emudev.de/gameboy-emulator/overview/
 - https://github.com/retrio/gb-test-roms
+- https://github.com/Hacktix/Bootix
