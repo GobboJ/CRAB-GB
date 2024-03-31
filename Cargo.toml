@@ -11,3 +11,4 @@ num-derive = "0.4.1"
 num-traits = "0.2.17"
 pixels = "0.13.0"
 winit = { version = "0.29", features = ["rwh_05"] }
+winit_input_helper = "0.16.0"

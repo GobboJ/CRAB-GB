@@ -7,7 +7,9 @@ use cpu::CPU;
 use pixels::{SurfaceTexture, Pixels};
 use winit::{event_loop::EventLoop, dpi::LogicalSize};
 use winit::window::WindowBuilder;
+use winit::keyboard::KeyCode;
 use game_loop::game_loop;
+use winit_input_helper::WinitInputHelper;
 
 const WIDTH: u32 = 160;
 const HEIGHT: u32 = 144;
@@ -19,12 +21,13 @@ fn read_rom(path: &str) -> Vec<u8> {
 
 struct Game {
     pixels: Pixels,
+    input: WinitInputHelper,
     cpu: CPU
 }
 
 impl Game {
     fn new(pixels: Pixels) -> Self {
-        Self { pixels, cpu: CPU::new() }
+        Self { pixels, input: WinitInputHelper::new(), cpu: CPU::new() }
     }
 }
 
@@ -66,6 +69,60 @@ fn main() {
 
         }, 
         |g, h| {
-            
+            if g.game.input.update(h) {
+                if g.game.input.key_pressed(KeyCode::Escape) || g.game.input.close_requested() {
+                    g.exit();
+                    return;
+                }
+
+                if g.game.input.key_held(KeyCode::KeyW) {
+                    g.game.cpu.set_button(cpu::joypad::Button::U);
+                } else {
+                    g.game.cpu.unset_button(cpu::joypad::Button::U);
+                }
+
+                if g.game.input.key_held(KeyCode::KeyS) {
+                    g.game.cpu.set_button(cpu::joypad::Button::D);
+                } else {
+                    g.game.cpu.unset_button(cpu::joypad::Button::D);
+                }
+
+                if g.game.input.key_held(KeyCode::KeyA) {
+                    g.game.cpu.set_button(cpu::joypad::Button::L);
+                } else {
+                    g.game.cpu.unset_button(cpu::joypad::Button::L);
+                }
+
+                if g.game.input.key_held(KeyCode::KeyD) {
+                    g.game.cpu.set_button(cpu::joypad::Button::R);
+                } else {
+                    g.game.cpu.unset_button(cpu::joypad::Button::R);
+                }
+
+                if g.game.input.key_held(KeyCode::KeyI) {
+                    g.game.cpu.set_button(cpu::joypad::Button::A);
+                } else {
+                    g.game.cpu.unset_button(cpu::joypad::Button::A);
+                }
+
+                if g.game.input.key_held(KeyCode::KeyJ) {
+                    g.game.cpu.set_button(cpu::joypad::Button::B);
+                } else {
+                    g.game.cpu.unset_button(cpu::joypad::Button::B);
+                }
+
+                if g.game.input.key_held(KeyCode::KeyN) {
+                    g.game.cpu.set_button(cpu::joypad::Button::STA);
+                } else {
+                    g.game.cpu.unset_button(cpu::joypad::Button::STA);
+                }
+
+                if g.game.input.key_held(KeyCode::KeyB) {
+                    g.game.cpu.set_button(cpu::joypad::Button::SEL);
+                } else {
+                    g.game.cpu.unset_button(cpu::joypad::Button::SEL);
+                }
+
+            }
         });
 }

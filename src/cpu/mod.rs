@@ -3,6 +3,7 @@ mod memory;
 mod timer;
 mod interrupt;
 mod gpu;
+pub(crate) mod joypad;
 
 use num_traits::FromPrimitive;
 use registers::Registers;
@@ -11,6 +12,9 @@ use memory::Memory;
 
 use crate::cpu::registers::DoubleRegister;
 use crate::cpu::registers::Register;
+
+use self::joypad::Button;
+use self::joypad::Joypad;
 
 pub struct CPU {
 
@@ -63,6 +67,14 @@ impl CPU {
 
             totalCycles += cycles as usize;
         }
+    }
+
+    pub fn set_button(&mut self, button: Button) {
+        self.memory.set_button(button);
+    }
+
+    pub fn unset_button(&mut self, button: Button) {
+        self.memory.unset_button(button);
     }
 
     pub fn get_framebuffer(&self) -> [u8; 160*144*4] {

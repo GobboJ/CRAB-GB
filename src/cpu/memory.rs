@@ -3,6 +3,7 @@ use std::fs;
 use super::timer::Timer;
 use super::interrupt::Interrupt;
 use super::gpu::GPU;
+use super::joypad::{Joypad, Button};
 
 struct Bootrom {
     code: [u8; 0x100],
@@ -52,7 +53,8 @@ pub struct Memory {
 
     timer: Timer,
     interrupt: Interrupt,
-    gpu: GPU
+    gpu: GPU,
+    joypad: Joypad
 }
 
 impl Memory {
@@ -70,7 +72,8 @@ impl Memory {
 
             timer: Timer::new(),
             interrupt: Interrupt::new(),
-            gpu: GPU::new()
+            gpu: GPU::new(),
+            joypad: Joypad::new()
         }
     }
 
@@ -172,9 +175,11 @@ impl Memory {
         // println!("[IO REA] {:#06x} = {}", address, res);
         match address {
             0xFF00 => {
-                // TODO Joypad
-                0
+                let res = self.joypad.read_register();
+                // println!("{:#010b}", res);
+                res
             },
+            0xFF04 => self.timer.read_div(),
             0xFF0F => self.interrupt.read_interrupt_flag(),
             0xFF40 => self.gpu.read_lcd_control(),
             0xFF41 => self.gpu.read_lcd_status(),
@@ -188,15 +193,19 @@ impl Memory {
         // println!("[IO WRI] {:#06x} = {:#04x}", address, data);
         match address {
             0xFF00 => {
-                // TODO Joypad
+                self.joypad.write_register(data);
             },
-            0xFF01 => print!("{}", data as char),
+            0xFF01 => {
+                // print!("{}", data as char)
+            },
             0xFF02 => {},
+            0xFF04 => self.timer.reset_div(),
             0xFF05 => self.timer.write_tima(data),
             0xFF06 => self.timer.write_tma(data),
             0xFF07 => self.timer.write_tac(data),
             0xFF0F => self.interrupt.write_interrupt_flag(data),
             0xFF10..=0xFF26 => {}, // Audio
+            0xFF30..=0xFF3F => {}, // Wave RAM
             0xFF40 => self.gpu.write_lcd_control(data),
             0xFF41 => self.gpu.write_lcd_status(data),
             0xFF42 => self.gpu.write_scy(data),
@@ -238,6 +247,17 @@ impl Memory {
         }
     }
 
+    pub fn set_button(&mut self, button: Button) {
+        let request_joystick = self.joypad.set_button(button);
+        if request_joystick {
+            self.get_interrupts().write_bit_interrupt_flag(&super::interrupt::InterruptHandler::Joypad, true);
+        }
+    }
+
+    pub fn unset_button(&mut self, button: Button) {
+        self.joypad.unset_button(button);
+    }
+
     pub fn get_interrupts(&mut self) -> &mut Interrupt {
         &mut self.interrupt
     }
@@ -245,4 +265,6 @@ impl Memory {
     pub fn get_gpu(&self) -> &GPU {
         &self.gpu
     }
+
+
 }

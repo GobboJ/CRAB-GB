@@ -49,6 +49,14 @@ impl Timer {
         self.tac = (self.tac & !(0b11)) | (frequency as u8);
     }
 
+    pub fn read_div(&self) -> u8 {
+        self.div
+    }
+
+    pub fn reset_div(&mut self) {
+        self.div = 0;
+    }
+
     pub fn write_tac(&mut self, value: u8) {
         self.tac = value;
     }
