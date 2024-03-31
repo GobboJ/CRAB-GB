@@ -1,3 +1,5 @@
+use core::panic;
+
 pub enum Button {
     A,
     B,
@@ -9,50 +11,75 @@ pub enum Button {
     D
 }
 
+#[derive(Clone, Copy)]
+enum Column { 
+    DPAD,
+    BUTTONS,
+    NONE 
+}
+
 pub struct Joypad {
-    register: u8
+    buttons: u8,
+    column: Column
 }
 
 impl Joypad {
 
     pub fn new() -> Self {
-        Joypad { register: 0xFF }
+        Joypad { buttons: 0, column: Column::NONE }
     }
 
     pub fn read_register(&self) -> u8 {
-        // println!("{:#010b} *", self.register);
-        if (self.register >> 4) & 0b11 == 0b11 {
-            self.register | 0xF 
-        }
-        else {
-            self.register
+        match self.column {
+            Column::DPAD => (0b10 << 4) | (!self.buttons & 0xF),
+            Column::BUTTONS => (0b01 << 4) | (!self.buttons >> 4),
+            Column::NONE => (0b11 << 4) | 0b1111,
         }
     }
 
     pub fn write_register(&mut self, value: u8) {
-        println!("{:#010b} -> {:#010b}", self.register, value);
-        self.register = value | (self.register & 0b1111);
-        println!("-> {:#010b}", self.register);
+        match value >> 4 & 0b11 {
+            0b01 => self.column = Column::BUTTONS,
+            0b10 => self.column = Column::DPAD,
+            0b11 => self.column = Column::NONE,
+            _ => panic!("Unexpected state")
+        }
     }
 
     pub fn set_button(&mut self, button: Button) -> bool {
-        // println!("{:#010b} *", self.register);
-        let old_value = self.register;
+        
+        let old_value = self.buttons;
         match button {
-            Button::A | Button::R => self.register &= !(1),
-            Button::B | Button::L => self.register &= !(1 << 1),
-            Button::SEL | Button::U => self.register &= !(1 << 2),
-            Button::STA | Button::D => self.register &= !(1 << 3),
+            Button::R => self.buttons |= 1,
+            Button::L => self.buttons |= 1 << 1,
+            Button::U => self.buttons |= 1 << 2,
+            Button::D => self.buttons |= 1 << 3,
+            Button::A => self.buttons |= 1 << 4,
+            Button::B => self.buttons |= 1 << 5,
+            Button::SEL => self.buttons |= 1 << 6,
+            Button::STA => self.buttons |= 1 << 7,
         }
-        // println!("{:#010b} ->", self.register);
 
-        let request_joypad = if old_value != self.register {
+        let request_joypad = if old_value != self.buttons {
             let is_dpad = match button {
                 Button::R | Button::L | Button::U | Button::D => true,
                 _ => false
             };
 
-            (is_dpad && (self.register >> 4 & 1) == 0) || (!is_dpad && (self.register >> 5 & 1) == 0)
+            let req_1 =if let Column::DPAD = self.column {
+                is_dpad
+            } else {
+                false
+            };
+
+            let req_2 = if let Column::BUTTONS = self.column {
+                !is_dpad
+            } else {
+                false
+            };
+
+            req_1 || req_2
+
         } else {
             false
         };
@@ -62,10 +89,14 @@ impl Joypad {
 
     pub fn unset_button(&mut self, button: Button) {
         match button {
-            Button::A | Button::R => self.register |= 1,
-            Button::B | Button::L => self.register |= 1 << 1,
-            Button::SEL | Button::U => self.register |= 1 << 2,
-            Button::STA | Button::D => self.register |= 1 << 3,
+            Button::R => self.buttons &= !(1),
+            Button::L => self.buttons &= !(1 << 1),
+            Button::U => self.buttons &= !(1 << 2),
+            Button::D => self.buttons &= !(1 << 3),
+            Button::A => self.buttons &= !(1 << 4),
+            Button::B => self.buttons &= !(1 << 5),
+            Button::SEL => self.buttons &= !(1 << 6),
+            Button::STA => self.buttons &= !(1 << 7),
         }
     }
 }
