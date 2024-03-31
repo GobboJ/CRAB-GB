@@ -66,20 +66,11 @@ impl Joypad {
                 _ => false
             };
 
-            let req_1 =if let Column::DPAD = self.column {
-                is_dpad
-            } else {
-                false
-            };
-
-            let req_2 = if let Column::BUTTONS = self.column {
-                !is_dpad
-            } else {
-                false
-            };
-
-            req_1 || req_2
-
+            match self.column {
+                Column::DPAD => is_dpad,
+                Column::BUTTONS => !is_dpad,
+                Column::NONE => false,
+            }
         } else {
             false
         };
