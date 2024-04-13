@@ -3,6 +3,8 @@ mod memory;
 mod timer;
 mod interrupt;
 mod gpu;
+mod register;
+
 pub(crate) mod joypad;
 
 use num_traits::FromPrimitive;

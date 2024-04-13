@@ -1,14 +1,16 @@
 use core::panic;
+use super::register::Register;
 
+#[derive(Clone, Copy)]
 pub enum Button {
-    A,
-    B,
-    SEL,
-    STA,
-    R,
-    L,
-    U,
-    D
+    R = 0,
+    L = 1,
+    U = 2,
+    D = 3,
+    A = 4,
+    B = 5,
+    SEL = 6,
+    STA = 7,
 }
 
 #[derive(Clone, Copy)]
@@ -19,20 +21,20 @@ enum Column {
 }
 
 pub struct Joypad {
-    buttons: u8,
+    buttons: Register,
     column: Column
 }
 
 impl Joypad {
 
     pub fn new() -> Self {
-        Joypad { buttons: 0, column: Column::NONE }
+        Joypad { buttons: Register::new(), column: Column::NONE }
     }
 
     pub fn read_register(&self) -> u8 {
         match self.column {
-            Column::DPAD => (0b10 << 4) | (!self.buttons & 0xF),
-            Column::BUTTONS => (0b01 << 4) | (!self.buttons >> 4),
+            Column::DPAD => (0b10 << 4) | self.buttons.low_nibble(),
+            Column::BUTTONS => (0b01 << 4) | self.buttons.high_nibble(),
             Column::NONE => (0b11 << 4) | 0b1111,
         }
     }
@@ -49,16 +51,7 @@ impl Joypad {
     pub fn set_button(&mut self, button: Button) -> bool {
         
         let old_value = self.buttons;
-        match button {
-            Button::R => self.buttons |= 1,
-            Button::L => self.buttons |= 1 << 1,
-            Button::U => self.buttons |= 1 << 2,
-            Button::D => self.buttons |= 1 << 3,
-            Button::A => self.buttons |= 1 << 4,
-            Button::B => self.buttons |= 1 << 5,
-            Button::SEL => self.buttons |= 1 << 6,
-            Button::STA => self.buttons |= 1 << 7,
-        }
+        self.buttons.unset_bit(button as u8);
 
         let request_joypad = if old_value != self.buttons {
             let is_dpad = match button {
@@ -79,15 +72,6 @@ impl Joypad {
     }
 
     pub fn unset_button(&mut self, button: Button) {
-        match button {
-            Button::R => self.buttons &= !(1),
-            Button::L => self.buttons &= !(1 << 1),
-            Button::U => self.buttons &= !(1 << 2),
-            Button::D => self.buttons &= !(1 << 3),
-            Button::A => self.buttons &= !(1 << 4),
-            Button::B => self.buttons &= !(1 << 5),
-            Button::SEL => self.buttons &= !(1 << 6),
-            Button::STA => self.buttons &= !(1 << 7),
-        }
+        self.buttons.set_bit(button as u8);
     }
 }
