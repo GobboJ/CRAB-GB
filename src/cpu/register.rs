@@ -11,15 +11,6 @@ impl ops::Not for Register {
     }
 }
 
-impl ops::BitAnd for Register {
-    type Output = Register;
-
-    fn bitand(self, rhs: Self) -> Self::Output {
-        Register(self.0 & rhs.0)
-    }
-}
-
-
 impl Register {
 
 
@@ -52,7 +43,7 @@ impl Register {
     }
 
     pub fn at(&self, position: u8) -> bool {
-        self.0 & (1 << position) == 1
+        self.0 & (1 << position) != 0
     }
 
 }
