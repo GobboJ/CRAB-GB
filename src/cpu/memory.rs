@@ -1,7 +1,7 @@
 use std::fs;
 
 use super::timer::Timer;
-use super::interrupt::Interrupt;
+use super::interrupt::{Interrupt, InterruptHandler};
 use super::gpu::GPU;
 use super::joypad::{Joypad, Button};
 
@@ -232,7 +232,7 @@ impl Memory {
     pub fn update_timer(&mut self, cycles: u8) {
         let interrupt = self.timer.update(cycles);
         if interrupt {
-            self.get_interrupts().write_bit_interrupt_flag(&super::interrupt::InterruptHandler::Timer, true);
+            self.get_interrupts().set_if_bit(InterruptHandler::Timer);
         }
     }
 
@@ -240,17 +240,17 @@ impl Memory {
         let (vblank, lcd) = self.gpu.update(cycles);
         if vblank {
             // println!("SET VBLANK INTERRUPT FLAG");
-            self.get_interrupts().write_bit_interrupt_flag(&super::interrupt::InterruptHandler::VBlank, true);
+            self.get_interrupts().set_if_bit(InterruptHandler::VBlank);
         }
         if lcd {
-            self.get_interrupts().write_bit_interrupt_flag(&super::interrupt::InterruptHandler::LCD, true);
+            self.get_interrupts().set_if_bit(InterruptHandler::LCD);
         }
     }
 
     pub fn set_button(&mut self, button: Button) {
         let request_joystick = self.joypad.set_button(button);
         if request_joystick {
-            self.get_interrupts().write_bit_interrupt_flag(&super::interrupt::InterruptHandler::Joypad, true);
+            self.get_interrupts().set_if_bit(InterruptHandler::Joypad);
         }
     }
 

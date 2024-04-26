@@ -15,6 +15,7 @@ use memory::Memory;
 use crate::cpu::registers::DoubleRegister;
 use crate::cpu::registers::Register;
 
+use self::interrupt::InterruptHandler;
 use self::joypad::Button;
 use self::joypad::Joypad;
 
@@ -1139,21 +1140,21 @@ impl CPU {
     fn handle_interrupts(&mut self) -> bool {
 
         let mut interrupted = true;
-        if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::VBlank){
+        if self.memory.get_interrupts().is_enabled_and_requested(InterruptHandler::VBlank){
             self.jump_interrupt(0x40);
-            self.memory.get_interrupts().write_bit_interrupt_flag(&interrupt::InterruptHandler::VBlank, false);
-        } else if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::LCD) {
+            self.memory.get_interrupts().unset_if_bit(InterruptHandler::VBlank);
+        } else if self.memory.get_interrupts().is_enabled_and_requested(InterruptHandler::LCD) {
             self.jump_interrupt(0x48);
-            self.memory.get_interrupts().write_bit_interrupt_flag(&interrupt::InterruptHandler::LCD, false);
-        } else if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::Timer) {
+            self.memory.get_interrupts().unset_if_bit(InterruptHandler::LCD);
+        } else if self.memory.get_interrupts().is_enabled_and_requested(InterruptHandler::Timer) {
             self.jump_interrupt(0x50);
-            self.memory.get_interrupts().write_bit_interrupt_flag(&interrupt::InterruptHandler::Timer, false);
-        } else if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::Serial){
+            self.memory.get_interrupts().unset_if_bit(InterruptHandler::Timer);
+        } else if self.memory.get_interrupts().is_enabled_and_requested(InterruptHandler::Serial){
             self.jump_interrupt(0x58);
-            self.memory.get_interrupts().write_bit_interrupt_flag(&interrupt::InterruptHandler::Serial, false);
-        } else if self.memory.get_interrupts().is_enabled_and_requested(&interrupt::InterruptHandler::Joypad) {
+            self.memory.get_interrupts().unset_if_bit(InterruptHandler::Serial);
+        } else if self.memory.get_interrupts().is_enabled_and_requested(InterruptHandler::Joypad) {
             self.jump_interrupt(0x60);
-            self.memory.get_interrupts().write_bit_interrupt_flag(&interrupt::InterruptHandler::Joypad, false);
+            self.memory.get_interrupts().unset_if_bit(InterruptHandler::Joypad);
         } else {
             interrupted = false;
         }
