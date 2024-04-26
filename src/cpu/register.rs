@@ -22,8 +22,9 @@ impl ops::BitAnd for Register {
 
 impl Register {
 
-    pub fn new() -> Self {
-        Register(0)
+
+    pub fn new(value: u8) -> Self {
+        Register(value)
     }
 
     pub fn to_u8(&self) -> u8 {

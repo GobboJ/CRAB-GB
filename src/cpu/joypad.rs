@@ -28,7 +28,7 @@ pub struct Joypad {
 impl Joypad {
 
     pub fn new() -> Self {
-        Joypad { buttons: Register::new(), column: Column::NONE }
+        Joypad { buttons: Register::new(0), column: Column::NONE }
     }
 
     pub fn read_register(&self) -> u8 {

@@ -18,8 +18,8 @@ impl Interrupt {
     
     pub fn new() -> Interrupt {
         Interrupt {
-            interrupt_enable: Register::new(),
-            interrupt_flag: Register::new()
+            interrupt_enable: Register::new(0),
+            interrupt_flag: Register::new(0)
         }
     }
 
